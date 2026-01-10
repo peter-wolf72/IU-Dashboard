@@ -1,0 +1,59 @@
+@startuml
+!define DARKBLUE
+!include style.plantuml
+hide circle
+skinparam classAttributeIconSize 0
+
+' Basisklasse
+class Kaffeemaschine {
+    -modell_name: str
+    -kaffeezaehler: int
+    +einschaltzustand: bool
+    +einschalten(): void
+    +bruehe_kaffee(): void
+    +reinige(): void
+}
+
+class PremiumKaffeemaschine {
+    +bruehe_espresso(): void
+    +verbinde_mit_app(): void
+}
+
+class App {
+    -benutzername: str
+    -passwort: str
+    +verbinde(): void
+    +starte_kaffee(): void
+}
+
+class Wassertank {
+    -volumen: float
+    -wasserstand: float
+    +auffuellen(): void    
+}
+
+class Bohne {
+    -sorte: str
+    -röstgrad: str    
+}
+
+class Bohnenbehaelter {
+    -kapazitaet: int
+    -ist_bohnenstand: int
+    +nachfuellen(bohne: Bohne): void    
+}
+
+' Aggregation: lose Verbindungen
+Bohnenbehaelter "1 " o-- "0..*" Bohne : enthält
+Kaffeemaschine "1 " o-- "1 " Wassertank
+
+' Komposition: fest verbaute Bestandteile
+Kaffeemaschine " 1" *-- "1" Bohnenbehaelter
+
+' Vererbung
+PremiumKaffeemaschine -up-|> Kaffeemaschine
+
+' Assoziation
+App "1 " -up-> "0..* " PremiumKaffeemaschine : steuert
+
+@enduml
