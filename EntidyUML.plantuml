@@ -1,59 +1,50 @@
-@startuml
+@startuml DashboardUML
 !define DARKBLUE
 !include style.plantuml
 hide circle
 skinparam classAttributeIconSize 0
 
 ' Basisklasse
-class Kaffeemaschine {
-    -modell_name: str
-    -kaffeezaehler: int
-    +einschaltzustand: bool
-    +einschalten(): void
-    +bruehe_kaffee(): void
-    +reinige(): void
+class Student {
+    -student_id: str
+    -name: str
+    -start_date: date
 }
 
-class PremiumKaffeemaschine {
-    +bruehe_espresso(): void
-    +verbinde_mit_app(): void
+class ModuleResult {
+    -module_id: str
+    -cp: int
+    -grade: float
+    -date_passed: date
 }
 
-class App {
-    -benutzername: str
-    -passwort: str
-    +verbinde(): void
-    +starte_kaffee(): void
-}
+together {
+    class Goal {
+        -goal_type: GoalType
+        -target_value: float
+        -adjustable: bool
+        -duration_months: int
+    }
 
-class Wassertank {
-    -volumen: float
-    -wasserstand: float
-    +auffuellen(): void    
-}
-
-class Bohne {
-    -sorte: str
-    -röstgrad: str    
-}
-
-class Bohnenbehaelter {
-    -kapazitaet: int
-    -ist_bohnenstand: int
-    +nachfuellen(bohne: Bohne): void    
-}
-
+    enum GoalType {
+        deadline
+        grade_avg
+        cp_pace
+    }
+}   
 ' Aggregation: lose Verbindungen
-Bohnenbehaelter "1 " o-- "0..*" Bohne : enthält
-Kaffeemaschine "1 " o-- "1 " Wassertank
+' Student "1 " o-- "0..*" ModuleResult : has
+' Student "1 " o-- "0..*" Goal : has
+Student "1 " -- "0..*" ModuleResult
+Student "1 " -- "1..*" Goal : has
 
-' Komposition: fest verbaute Bestandteile
-Kaffeemaschine " 1" *-- "1" Bohnenbehaelter
+' ' Komposition: fest verbaute Bestandteile
+' Kaffeemaschine " 1" *-- "1" Bohnenbehaelter
 
-' Vererbung
-PremiumKaffeemaschine -up-|> Kaffeemaschine
+' ' Vererbung
+' PremiumKaffeemaschine -up-|> Kaffeemaschine
 
-' Assoziation
-App "1 " -up-> "0..* " PremiumKaffeemaschine : steuert
+' ' Assoziation
+' App "1 " -up-> "0..* " PremiumKaffeemaschine : steuert
 
 @enduml
