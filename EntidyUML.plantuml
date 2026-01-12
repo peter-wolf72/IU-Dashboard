@@ -9,11 +9,23 @@ class Student {
     -student_id: str
     -name: str
     -start_date: date
+
+    ' Fachliche Methoden (keine Getter/Setter)
+    +get_earned_ects(): int
+    +get_average_grade(): float
+    +get_cp_pace_per_month(): float
+    +is_on_track(duration_months: int): bool
 }
 
-class ModuleResult {
+' Allgemeines Modul (Stammdaten)
+class Module {
     -module_id: str
-    -cp: int
+    -title: str
+    -ects: int
+}
+
+' Assoziationsklasse / Belegung: verbindet Student und Module
+class Enrollment {
     -grade: float
     -date_passed: date
 }
@@ -24,6 +36,9 @@ together {
         -target_value: float
         -adjustable: bool
         -duration_months: int
+
+        ' Optional, wenn du Logik eher am Goal zeigen willst:
+        +is_reached(student: Student): bool
     }
 
     enum GoalType {
@@ -31,20 +46,12 @@ together {
         grade_avg
         cp_pace
     }
-}   
-' Aggregation: lose Verbindungen
-' Student "1 " o-- "0..*" ModuleResult : has
-' Student "1 " o-- "0..*" Goal : has
-Student "1 " -- "0..*" ModuleResult
-Student "1 " -- "1..*" Goal : has
+}
 
-' ' Komposition: fest verbaute Bestandteile
-' Kaffeemaschine " 1" *-- "1" Bohnenbehaelter
+' Beziehungen
+Student "1" -- "0..*" Enrollment
+Module  "1" -- "0..*" Enrollment
 
-' ' Vererbung
-' PremiumKaffeemaschine -up-|> Kaffeemaschine
-
-' ' Assoziation
-' App "1 " -up-> "0..* " PremiumKaffeemaschine : steuert
+Student "1" -- "1..*" Goal : has
 
 @enduml
