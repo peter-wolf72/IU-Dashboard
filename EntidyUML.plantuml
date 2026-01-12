@@ -1,57 +1,85 @@
-@startuml DashboardUML
+@startuml DashboardUML_OCP
+' --- Style / Layout ---
 !define DARKBLUE
 !include style.plantuml
 hide circle
 skinparam classAttributeIconSize 0
 
-' Basisklasse
 class Student {
-    -student_id: str
-    -name: str
-    -start_date: date
+  -student_id: str
+  -name: str
+  -start_date: date
 
-    ' Fachliche Methoden (keine Getter/Setter)
-    +get_earned_ects(): int
-    +get_average_grade(): float
-    +get_cp_pace_per_month(): float
-    +is_on_track(duration_months: int): bool
+  +get_average_grade(): float
+  +get_time_progress_percentage(duration_months: int): float
+  +get_cp_progress_percentage(total_ects: int): float
+  +get_earned_ects(): int
+  +get_cp_pace_per_month(): float
 }
 
-' Allgemeines Modul (Stammdaten)
 class Module {
-    -module_id: str
-    -title: str
-    -ects: int
+  -module_id: str
+  -title: str
+  -ects: int
 }
 
-' Assoziationsklasse / Belegung: verbindet Student und Module
+' Assoziationsklasse zwischen Student und Module
 class Enrollment {
-    -grade: float
-    -date_passed: date
+  -grade: float
+  -date_passed: date
 }
 
-together {
-    class Goal {
-        -goal_type: GoalType
-        -target_value: float
-        -adjustable: bool
-        -duration_months: int
-
-        ' Optional, wenn du Logik eher am Goal zeigen willst:
-        +is_reached(student: Student): bool
-    }
-
-    enum GoalType {
-        deadline
-        grade_avg
-        cp_pace
-    }
-}
-
-' Beziehungen
 Student "1" -- "0..*" Enrollment
 Module  "1" -- "0..*" Enrollment
 
+class StudyProgram {
+  -program_id: str
+  -name: str
+  -total_ects: int
+}
+Student "1" -- "1" StudyProgram : studies
+StudyProgram "1" -- "0..*" Module : contains
+
+enum Status {
+  GREEN
+  YELLOW
+  RED
+}
+
+class GoalEvaluation {
+  -status: Status
+  -value: float
+  -target: float
+  -value2: float
+  -target2: float
+  -label1: str
+  -label2: str
+}
+
+abstract class Goal {
+  -adjustable: bool
+
+  +evaluate(student: Student, program: StudyProgram): GoalEvaluation
+  +get_title(): str
+}
+
 Student "1" -- "1..*" Goal : has
+Goal ..> GoalEvaluation
+Goal ..> Status
+
+class GradeAverageGoal {
+  -target_avg: float
+}
+Goal <|-- GradeAverageGoal
+
+class DeadlineGoal {
+  -duration_months: int
+}
+Goal <|-- DeadlineGoal
+
+class CpPaceGoal {
+  -target_cp_per_month: float
+}
+Goal <|-- CpPaceGoal
 
 @enduml
