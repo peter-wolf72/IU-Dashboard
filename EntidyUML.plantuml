@@ -5,28 +5,29 @@
 hide circle
 skinparam classAttributeIconSize 0
 
-class Student {
-  -student_id: str
-  -name: str
-  -start_date: date
+together {
+  class Student {
+    -student_id: str
+    -name: str
+    -start_date: date
 
-  +get_average_grade(): float
-  +get_time_progress_percentage(duration_months: int): float
-  +get_cp_progress_percentage(total_ects: int): float
-  +get_earned_ects(): int
-  +get_cp_pace_per_month(): float
-}
+    +get_average_grade(): float
+    +get_time_progress_percentage(duration_months: int): float
+    +get_cp_progress_percentage(total_ects: int): float
+    +get_earned_ects(): int
+    +get_cp_pace_per_month(): float
+  }
 
-class Module {
-  -module_id: str
-  -title: str
-  -ects: int
-}
+  class Enrollment {
+    -grade: float
+    -date_passed: date
+  }
 
-' Assoziationsklasse zwischen Student und Module
-class Enrollment {
-  -grade: float
-  -date_passed: date
+  class Module {
+    -module_id: str
+    -title: str
+    -ects: int
+  }
 }
 
 Student "1" -- "0..*" Enrollment
@@ -38,7 +39,7 @@ class StudyProgram {
   -total_ects: int
 }
 Student "1" -- "1" StudyProgram : studies
-StudyProgram "1" -- "0..*" Module : contains
+StudyProgram "1" -- "1..*" Module : contains
 
 enum Status {
   GREEN
@@ -57,10 +58,8 @@ class GoalEvaluation {
 }
 
 abstract class Goal {
-  -adjustable: bool
-
   +evaluate(student: Student, program: StudyProgram): GoalEvaluation
-  +get_title(): str
+  {abstract} +get_title(): str
 }
 
 Student "1" -- "1..*" Goal : has
@@ -69,16 +68,19 @@ Goal ..> Status
 
 class GradeAverageGoal {
   -target_avg: float
+  +get_title(): str
 }
 Goal <|-- GradeAverageGoal
 
 class DeadlineGoal {
   -duration_months: int
+  +get_title(): str
 }
 Goal <|-- DeadlineGoal
 
 class CpPaceGoal {
   -target_cp_per_month: float
+  +get_title(): str
 }
 Goal <|-- CpPaceGoal
 
