@@ -29,6 +29,7 @@ class DashboardGUI(tk.Frame):
             self.conn = None
         else:
             self.cursor = self.conn.cursor()
+            self.init_db()
             logging.info("Database connected successfully.")
         
         self.create_widgets()
@@ -62,7 +63,3 @@ class DashboardGUI(tk.Frame):
         finally:
             self.master.destroy()
 
-if __name__ == "__main__":
-    main_window = tk.Tk()
-    dashboard_app = DashboardGUI(main_window)
-    main_window.mainloop()
