@@ -1,10 +1,13 @@
-@startuml DashboardUML_OCP
+@startuml DashboardUML_Expanded
 ' --- Style / Layout ---
 !define DARKBLUE
 !include style.plantuml
 hide circle
 skinparam classAttributeIconSize 0
 
+' =========================
+' 1) Domain (aus deinem UML)
+' =========================
 together {
   class Student {
     -student_id: str
@@ -15,7 +18,7 @@ together {
     +get_time_progress_percentage(duration_months: int): float
     +get_cp_progress_percentage(total_ects: int): float
     +get_earned_ects(): int
-    +get_cp_pace_per_month(): float
+    +get_cp_per_month(): float
   }
 
   class Enrollment {
@@ -28,16 +31,17 @@ together {
     -title: str
     -ects: int
   }
+
+  class StudyProgram {
+    -program_id: str
+    -name: str
+    -total_ects: int
+    -duration_months: int
+  }
 }
 
 Student "1" -- "0..*" Enrollment
 Module  "1" -- "0..*" Enrollment
-
-class StudyProgram {
-  -program_id: str
-  -name: str
-  -total_ects: int
-}
 Student "1" -- "1" StudyProgram : studies
 StudyProgram "1" -- "1..*" Module : contains
 
@@ -83,5 +87,115 @@ class CpPaceGoal {
   +get_title(): str
 }
 Goal <|-- CpPaceGoal
+
+
+' ==================================
+' 2) Technical / Application classes
+' ==================================
+
+' package "Application / Bootstrapping" {
+'   class App {
+'     +main(): None
+'   }
+' }
+' Die Datei/das Skript als Container
+' class "main.py" << (M,#FF7700) file >> {
+'   + main()
+' }
+class Main <<bootstrap>> {
+  +main(): None
+}
+
+
+package "UI (tkinter)" {
+  class DashboardGUI <<View>> {
+    -master: tk.Tk
+    -db: Database
+    -notebook: ttk.Notebook
+    -tab_overview: ttk.Frame
+    -tab_entry: ttk.Frame
+    +create_widgets(): None
+    +on_window_close(): None
+  }
+
+  ' Optional: wenn du die Tabs später auslagerst (sauberer)
+  class OverviewTab <<View>> {
+    +render(): None
+    +update_overview(data: GoalEvaluation[*]): None
+  }
+
+  class EntryTab <<View>> {
+    +render(): None
+  }
+
+  DashboardGUI o-- OverviewTab
+  DashboardGUI o-- EntryTab
+}
+
+package "Controller / Service" {
+  class DashboardController <<Controller>> {
+    -service: DashboardService
+    -student_repo: StudentRepository
+    +load_initial_data(): None
+    +save_student(student: Student): None
+    +compute_overview(student_id: str): GoalEvaluation[*]
+  }
+
+  class DashboardService <<Service>> {
+    +calc_average_grade(student: Student): float
+    +calc_time_progress(student: Student, program: StudyProgram): float
+    +calc_cp_progress(student: Student, program: StudyProgram): float
+    +calc_cp_pace(student: Student): float
+    +evaluate_goals(student: Student, program: StudyProgram, goals: Goal[*]): GoalEvaluation[*]
+  }
+}
+
+package "Persistence (SQLite)" {
+  class Database {
+    -db_path: str
+    -conn: sqlite3.Connection
+    +connect(): None
+    +init_db(): None
+    +close(): None
+  }
+
+  class StudentRepository <<Repository>> {
+    -db: Database
+    +add(student: Student): None
+    +get_by_id(student_id: str): Student
+    +update(student: Student): None
+  }
+
+  ' Optional: später analog
+  ' class ModuleRepository <<Repository>> { ... }
+  ' class EnrollmentRepository <<Repository>> { ... }
+}
+
+' ==========================
+' 3) Connections / dependencies
+' ==========================
+
+' App erstellt/verdrahtet alles (entspricht deinem main.py)
+' main.py ..> Database : creates
+' main.py ..> DashboardGUI : creates
+Main ..> Database : creates
+Main ..> DashboardGUI : creates
+
+
+' GUI nutzt Controller statt direkt DB (aktueller Stand: GUI hat DB; Ziel: GUI -> Controller)
+DashboardGUI ..> DashboardController : calls (recommended)
+
+' Controller nutzt Repos + Service
+DashboardController --> DashboardService
+DashboardController --> StudentRepository
+
+' Repo nutzt Database
+StudentRepository --> Database
+
+' Service nutzt Domain
+DashboardService ..> Student
+DashboardService ..> StudyProgram
+DashboardService ..> Goal
+DashboardService ..> GoalEvaluation
 
 @enduml

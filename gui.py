@@ -1,37 +1,18 @@
+#
 import tkinter as tk
 from tkinter import ttk
-import datetime
-import decimal
-import sqlite3
-import logging
+from database import Database
 
-
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
 
 class DashboardGUI(tk.Frame):
-    def __init__(self, master):
+    def __init__(self, master: tk.Tk, db: Database):
         super().__init__(master)
         self.master = master
-        self.master.title("Dashboard GUI")
-
-        #Geometry-Management
-        self.master.geometry("800x600")
-        self.pack(fill="both", expand=True)
+        self.db = db
 
         # Handle window close event
         self.master.protocol("WM_DELETE_WINDOW", self.on_window_close)
-        
-        # Initialize database connection
-        try:
-            self.conn = sqlite3.connect('dashboard.db')
-        except sqlite3.Error as e:
-            logging.error(f"Database connection error: {e}.")
-            self.conn = None
-        else:
-            self.cursor = self.conn.cursor()
-            self.init_db()
-            logging.info("Database connected successfully.")
-        
+                
         self.create_widgets()
 
     def create_widgets(self):
@@ -51,15 +32,10 @@ class DashboardGUI(tk.Frame):
             padx=12, pady=12, anchor="w"
         )
 
-            
-    def close(self):
-        self.conn.close()
-
     def on_window_close(self):
         # Ensure resources are cleaned up properly
         try:
-            self.close()
-            logging.info("Resources cleaned up successfully.")
+            self.db.close()
         finally:
             self.master.destroy()
 
