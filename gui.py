@@ -1,14 +1,14 @@
 #
 import tkinter as tk
 from tkinter import ttk
-from database import Database
-
+from controller import DashboardController
+import datetime
 
 class DashboardGUI(tk.Frame):
-    def __init__(self, master: tk.Tk, db: Database):
+    def __init__(self, master: tk.Tk, controller: DashboardController):
         super().__init__(master)
         self.master = master
-        self.db = db
+        self.controller = controller
 
         # Handle window close event
         self.master.protocol("WM_DELETE_WINDOW", self.on_window_close)
@@ -32,10 +32,24 @@ class DashboardGUI(tk.Frame):
             padx=12, pady=12, anchor="w"
         )
 
+    def on_save_student(self):
+        sid = self.student_id_var.get().strip()
+        name = self.name_var.get().strip()
+        start_date = datetime.date.fromisoformat(self.start_var.get().strip())
+        self.controller.save_student(sid, name, start_date)
+
+    def on_load_overview(self):
+        sid = self.student_id_var.get().strip()
+        data = self.controller.get_overview(sid)
+        if "error" in data:
+            self.overview_label.config(text=data["error"])
+        else:
+            self.overview_label.config(
+                text=f"Name: {data['student_name']}\nNotenschnitt: {data['average_grade']}\nCP/Monat: {data['cp_per_month']}"
+            )
+
     def on_window_close(self):
-        # Ensure resources are cleaned up properly
         try:
-            self.db.close()
+            self.controller.shutdown()
         finally:
             self.master.destroy()
-
