@@ -1,10 +1,11 @@
 # services.py
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from repositories import StudentRepository
+from dataclasses import dataclass
 
+@dataclass
 class DashboardService:
-    def __init__(self, student_repo: StudentRepository) -> None:
-        self.student_repo = student_repo
+    student_repo: StudentRepository
 
     def get_overview(self, student_id: str) -> Dict[str, Any]:
         """

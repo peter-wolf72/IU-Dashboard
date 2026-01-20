@@ -3,19 +3,21 @@ import tkinter as tk
 from tkinter import ttk
 from controller import DashboardController
 import datetime
+from dataclasses import dataclass
 
+@dataclass
 class DashboardGUI(tk.Frame):
-    def __init__(self, master: tk.Tk, controller: DashboardController):
-        super().__init__(master)
-        self.master = master
-        self.controller = controller
+    master: tk.Tk
+    controller: DashboardController
+    def __post_init__(self) -> None:
+        super().__init__(self.master)
 
         # Handle window close event
         self.master.protocol("WM_DELETE_WINDOW", self.on_window_close)
                 
         self.create_widgets()
 
-    def create_widgets(self):
+    def create_widgets(self) -> None:
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True)
 
@@ -32,13 +34,13 @@ class DashboardGUI(tk.Frame):
             padx=12, pady=12, anchor="w"
         )
 
-    def on_save_student(self):
+    def on_save_student(self) -> None:
         sid = self.student_id_var.get().strip()
         name = self.name_var.get().strip()
         start_date = datetime.date.fromisoformat(self.start_var.get().strip())
         self.controller.save_student(sid, name, start_date)
 
-    def on_load_overview(self):
+    def on_load_overview(self) -> None:
         sid = self.student_id_var.get().strip()
         data = self.controller.get_overview(sid)
         if "error" in data:
@@ -48,7 +50,7 @@ class DashboardGUI(tk.Frame):
                 text=f"Name: {data['student_name']}\nNotenschnitt: {data['average_grade']}\nCP/Monat: {data['cp_per_month']}"
             )
 
-    def on_window_close(self):
+    def on_window_close(self) -> None:
         try:
             self.controller.shutdown()
         finally:

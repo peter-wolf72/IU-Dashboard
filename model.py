@@ -1,12 +1,13 @@
 # model.py
 import datetime
-import decimal
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
+@dataclass(frozen=True)
 class Student:
-    def __init__(self, student_id: str, name: str, start_date: datetime.date):
-        self.__student_id = student_id
-        self.__name = name
-        self.__start_date = start_date
+    student_id: str
+    name: str
+    start_date: datetime.date
     
     def get_average_grade(self) -> float:
         # Placeholder implementation
@@ -28,18 +29,9 @@ class Student:
         # Placeholder implementation
         return 3.75
     
-    @property
-    def student_id(self) -> str:
-        return self.__student_id
-    @property
-    def name(self) -> str:
-        return self.__name
-    @property
-    def start_date(self) -> datetime.date:
-        return self.__start_date    
-    
+@dataclass(frozen=True)
 class StudyProgram:
-    def __init__(self, program_id: int, name: str, total_ects: int, duration_months: int):
-        self.__program_id = program_id
-        self.__name = name
-        self.__total_ects = total_ects
+    program_id: str
+    name: str
+    total_ects: int
+    duration_months: int

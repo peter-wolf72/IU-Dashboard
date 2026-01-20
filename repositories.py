@@ -1,14 +1,14 @@
 # repositories.py
 import logging
-from typing import Optional
 import datetime
-
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from database import Database
 from model import Student
 
+@dataclass
 class StudentRepository:
-    def __init__(self, db: Database) -> None:
-        self.db = db
+    db: Database
 
     def upsert(self, student: Student) -> None:
         """Insert oder Update (für Prototyp angenehm)."""
@@ -29,7 +29,7 @@ class StudentRepository:
         self.db.conn.commit()
         logging.info("Student saved: %s", student.student_id)
 
-    def get_by_id(self, student_id: str) -> Optional[Student]:
+    def get_by_id(self, student_id: str) -> Student | None:
         if self.db.conn is None:
             raise RuntimeError("Database not connected")
 

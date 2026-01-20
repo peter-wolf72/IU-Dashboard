@@ -1,15 +1,16 @@
 # controller.py
 import datetime
 from typing import Dict, Any
-
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from services import DashboardService
 from model import Student
 from database import Database
 
+@dataclass
 class DashboardController:
-    def __init__(self, service: DashboardService, db: Database) -> None:
-        self.service = service
-        self.db = db  # für close()
+    service: DashboardService
+    db: Database
 
     def save_student(self, student_id: str, name: str, start_date: datetime.date) -> None:
         student = Student(student_id, name, start_date)

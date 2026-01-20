@@ -2,12 +2,12 @@
 import sqlite3
 import logging
 from typing import Optional
+from dataclasses import dataclass
 
+@dataclass
 class Database:
-    def __init__(self, db_path: str = "dashboard.db") -> None:
-        self.db_path = db_path
-        self.conn: Optional[sqlite3.Connection] = None
-
+    db_path: str = "dashboard.db"
+    conn: Optional[sqlite3.Connection] = None
     def connect(self) -> None:
         try:
             self.conn = sqlite3.connect(self.db_path)

@@ -16,7 +16,7 @@ def main():
     db.connect()
     db.init_db()
 
-    student_repo = StudentRepository(db)
+    student_repo = StudentRepository(database=db)
     service = DashboardService(student_repo)
     controller = DashboardController(service, db)
 
