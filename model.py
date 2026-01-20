@@ -28,6 +28,16 @@ class Student:
         # Placeholder implementation
         return 3.75
     
+    @property
+    def student_id(self) -> str:
+        return self.__student_id
+    @property
+    def name(self) -> str:
+        return self.__name
+    @property
+    def start_date(self) -> datetime.date:
+        return self.__start_date    
+    
 class StudyProgram:
     def __init__(self, program_id: int, name: str, total_ects: int, duration_months: int):
         self.__program_id = program_id
