@@ -1,156 +1,113 @@
-@startuml DashboardUML_Expanded
+@startuml DashboardUML_MVC_StrictDI
 ' --- Style / Layout ---
 !define DARKBLUE
 !include style.plantuml
 hide circle
 skinparam classAttributeIconSize 0
 
-' =========================
-' 1) Domain (aus deinem UML)
-' =========================
-together {
-  class Student {
-    -student_id: str
-    -name: str
-    -start_date: date
-
-    +get_average_grade(): float
-    +get_time_progress_percentage(duration_months: int): float
-    +get_cp_progress_percentage(total_ects: int): float
-    +get_earned_ects(): int
-    +get_cp_per_month(): float
-  }
-
-  class Enrollment {
-    -grade: float
-    -date_passed: date
-  }
-
-  class Module {
-    -module_id: str
-    -title: str
-    -ects: int
-  }
-
-  class StudyProgram {
-    -program_id: str
-    -name: str
-    -total_ects: int
-    -duration_months: int
-  }
-}
-
-Student "1" -- "0..*" Enrollment
-Module  "1" -- "0..*" Enrollment
-Student "1" -- "1" StudyProgram : studies
-StudyProgram "1" -- "1..*" Module : contains
-
-enum Status {
-  GREEN
-  YELLOW
-  RED
-}
-
-class GoalEvaluation {
-  -status: Status
-  -value: float
-  -target: float
-  -value2: float
-  -target2: float
-  -label1: str
-  -label2: str
-}
-
-abstract class Goal {
-  +evaluate(student: Student, program: StudyProgram): GoalEvaluation
-  {abstract} +get_title(): str
-}
-
-Student "1" -- "1..*" Goal : has
-Goal ..> GoalEvaluation
-Goal ..> Status
-
-class GradeAverageGoal {
-  -target_avg: float
-  +get_title(): str
-}
-Goal <|-- GradeAverageGoal
-
-class DeadlineGoal {
-  -duration_months: int
-  +get_title(): str
-}
-Goal <|-- DeadlineGoal
-
-class CpPaceGoal {
-  -target_cp_per_month: float
-  +get_title(): str
-}
-Goal <|-- CpPaceGoal
-
-
-' ==================================
-' 2) Technical / Application classes
-' ==================================
-
-' package "Application / Bootstrapping" {
-'   class App {
-'     +main(): None
-'   }
-' }
-' Die Datei/das Skript als Container
-' class "main.py" << (M,#FF7700) file >> {
-'   + main()
-' }
-class Main <<bootstrap>> {
+' -------------------------
+' Bootstrapping
+' -------------------------
+class Main <<Bootstrapping>>{
   +main(): None
 }
 
+' =========================
+' MODEL
+' =========================
+package "Model" {
 
-package "UI (tkinter)" {
-  class DashboardGUI <<View>> {
-    -master: tk.Tk
-    -db: Database
-    -notebook: ttk.Notebook
-    -tab_overview: ttk.Frame
-    -tab_entry: ttk.Frame
-    +create_widgets(): None
-    +on_window_close(): None
+  ' --- Domain ---
+  together {
+    class Student {
+      -student_id: str
+      -name: str
+      -start_date: date
+
+      +get_average_grade(): float
+      +get_time_progress_percentage(duration_months: int): float
+      +get_cp_progress_percentage(total_ects: int): float
+      +get_earned_ects(): int
+      +get_cp_per_month(): float
+    }
+
+    class Enrollment {
+      -grade: float
+      -date_passed: date
+    }
+
+    class Module {
+      -module_id: str
+      -title: str
+      -ects: int
+    }
+
+    class StudyProgram {
+      -program_id: str
+      -name: str
+      -total_ects: int
+      -duration_months: int
+    }
   }
 
-  ' Optional: wenn du die Tabs später auslagerst (sauberer)
-  class OverviewTab <<View>> {
-    +render(): None
-    +update_overview(data: GoalEvaluation[*]): None
+  Student "1" -- "0..*" Enrollment
+  Module  "1" -- "0..*" Enrollment
+  Student "1" -- "1" StudyProgram : studies
+  StudyProgram "1" -- "1..*" Module : contains
+
+  enum Status {
+    GREEN
+    YELLOW
+    RED
   }
 
-  class EntryTab <<View>> {
-    +render(): None
+  class GoalEvaluation {
+    -status: Status
+    -value: float
+    -target: float
+    -value2: float
+    -target2: float
+    -label1: str
+    -label2: str
   }
 
-  DashboardGUI o-- OverviewTab
-  DashboardGUI o-- EntryTab
-}
-
-package "Controller / Service" {
-  class DashboardController <<Controller>> {
-    -service: DashboardService
-    -student_repo: StudentRepository
-    +load_initial_data(): None
-    +save_student(student: Student): None
-    +compute_overview(student_id: str): GoalEvaluation[*]
+  abstract class Goal {
+    +evaluate(student: Student, program: StudyProgram): GoalEvaluation
+    {abstract} +get_title(): str
   }
 
-  class DashboardService <<Service>> {
+  Student "1" -- "1..*" Goal : has
+  Goal ..> GoalEvaluation
+  Goal ..> Status
+
+  class GradeAverageGoal {
+    -target_avg: float
+    +get_title(): str
+  }
+  Goal <|-- GradeAverageGoal
+
+  class DeadlineGoal {
+    -duration_months: int
+    +get_title(): str
+  }
+  Goal <|-- DeadlineGoal
+
+  class CpPaceGoal {
+    -target_cp_per_month: float
+    +get_title(): str
+  }
+  Goal <|-- CpPaceGoal
+
+  ' --- Business Logic ---
+  class DashboardService {
     +calc_average_grade(student: Student): float
     +calc_time_progress(student: Student, program: StudyProgram): float
     +calc_cp_progress(student: Student, program: StudyProgram): float
     +calc_cp_pace(student: Student): float
     +evaluate_goals(student: Student, program: StudyProgram, goals: Goal[*]): GoalEvaluation[*]
   }
-}
 
-package "Persistence (SQLite)" {
+  ' --- Persistence ---
   class Database {
     -db_path: str
     -conn: sqlite3.Connection
@@ -159,43 +116,107 @@ package "Persistence (SQLite)" {
     +close(): None
   }
 
-  class StudentRepository <<Repository>> {
+  class StudentRepository {
     -db: Database
     +add(student: Student): None
     +get_by_id(student_id: str): Student
     +update(student: Student): None
+    +close(): None
   }
 
-  ' Optional: später analog
-  ' class ModuleRepository <<Repository>> { ... }
-  ' class EnrollmentRepository <<Repository>> { ... }
+  class ModuleRepository {
+    -db: Database
+    +add(module: Module): None
+    +get_by_id(module_id: str): Module
+    +close(): None
+  }
+  
+  class EnrollmentRepository {
+    -db: Database
+    +upsert(student_id: str, module_id: str, grade: float, date_passed: date): None
+    +list_by_student(student_id: str): Enrollment[*]
+    +close(): None
+  }
+
+  StudentRepository --> Database
+  ModuleRepository --> Database
+  EnrollmentRepository --> Database
+
+  StudentRepository ..> Student
+  ModuleRepository ..> Module
+  EnrollmentRepository ..> Enrollment
+
+  DashboardService ..> Student
+  DashboardService ..> StudyProgram
+  DashboardService ..> Goal
+  DashboardService ..> GoalEvaluation
+}
+
+' =========================
+' CONTROLLER
+' =========================
+package "Controller" {
+  class DashboardController {
+    -service: DashboardService
+    -student_repo: StudentRepository
+    -module_repo: ModuleRepository
+    -enrollment_repo: EnrollmentRepository
+
+    +load_initial_data(): None
+    +save_student(student: Student): None
+    +compute_overview(student_id: str): GoalEvaluation[*]
+
+    +shutdown(): None
+  }
+}
+
+' =========================
+' VIEW
+' =========================
+package "View" {
+  class DashboardGUI {
+    -master: tk.Tk
+    -controller: DashboardController
+    -notebook: ttk.Notebook
+    -tab_overview: ttk.Frame
+    -tab_entry: ttk.Frame
+
+    +create_widgets(): None
+    +on_window_close(): None
+  }
+
+  class TargetMonitoring {
+    +render(): None
+    +update_overview(data: GoalEvaluation[*]): None
+  }
+
+  class DataCollection {
+    +render(): None
+  }
+
+  DashboardGUI o-- TargetMonitoring
+  DashboardGUI o-- DataCollection
+
+  DashboardGUI ..> DashboardController : calls
 }
 
 ' ==========================
-' 3) Connections / dependencies
+' Wiring / Dependency Injection (Main)
 ' ==========================
-
-' App erstellt/verdrahtet alles (entspricht deinem main.py)
-' main.py ..> Database : creates
-' main.py ..> DashboardGUI : creates
 Main ..> Database : creates
-Main ..> DashboardGUI : creates
+Main ..> StudentRepository : creates (injects Database)
+Main ..> DashboardService : creates
+Main ..> DashboardController : creates (injects Service+Repositories)
+Main ..> DashboardGUI : creates (injects Controller)
 
-
-' GUI nutzt Controller statt direkt DB (aktueller Stand: GUI hat DB; Ziel: GUI -> Controller)
-DashboardGUI ..> DashboardController : calls (recommended)
-
-' Controller nutzt Repos + Service
 DashboardController --> DashboardService
 DashboardController --> StudentRepository
+DashboardController --> ModuleRepository
+DashboardController --> EnrollmentRepository
 
-' Repo nutzt Database
-StudentRepository --> Database
-
-' Service nutzt Domain
-DashboardService ..> Student
-DashboardService ..> StudyProgram
-DashboardService ..> Goal
-DashboardService ..> GoalEvaluation
+' ==========================
+' Shutdown / Close DB
+' ==========================
+DashboardGUI ..> DashboardController : shutdown()
 
 @enduml

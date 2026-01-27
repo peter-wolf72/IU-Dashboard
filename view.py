@@ -21,16 +21,16 @@ class DashboardGUI(tk.Frame):
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill="both", expand=True)
 
-        self.tab_overview = ttk.Frame(self.notebook)
-        self.tab_entry = ttk.Frame(self.notebook)
-        self.notebook.add(self.tab_overview, text="Zielübersicht")
-        self.notebook.add(self.tab_entry, text="Datenerfassung")
+        self.tab_target_monitoring = ttk.Frame(self.notebook)
+        self.tab_data_collection = ttk.Frame(self.notebook)
+        self.notebook.add(self.tab_target_monitoring, text="Zielüberwachung")
+        self.notebook.add(self.tab_data_collection, text="Datenerfassung")
 
         # Platzhalter-Inhalte (kannst du später ersetzen)
-        ttk.Label(self.tab_overview, text="(Platzhalter) Zielübersicht").pack(
+        ttk.Label(self.tab_target_monitoring, text="(Platzhalter) Zielüberwachung").pack(
             padx=12, pady=12, anchor="w"
         )
-        ttk.Label(self.tab_entry, text="(Platzhalter) Datenerfassung").pack(
+        ttk.Label(self.tab_data_collection, text="(Platzhalter) Datenerfassung").pack(
             padx=12, pady=12, anchor="w"
         )
 
