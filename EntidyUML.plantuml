@@ -106,36 +106,37 @@ package "Model" {
     +calc_cp_pace(student: Student): float
     +evaluate_goals(student: Student, program: StudyProgram, goals: Goal[*]): GoalEvaluation[*]
   }
+  together {
+    ' --- Persistence ---
+    class Database {
+      -db_path: str
+      -conn: sqlite3.Connection
+      +connect(): None
+      +init_db(): None
+      +close(): None
+    }
 
-  ' --- Persistence ---
-  class Database {
-    -db_path: str
-    -conn: sqlite3.Connection
-    +connect(): None
-    +init_db(): None
-    +close(): None
-  }
+    class StudentRepository {
+      -db: Database
+      +add(student: Student): None
+      +get_by_id(student_id: str): Student
+      +update(student: Student): None
+      +close(): None
+    }
 
-  class StudentRepository {
-    -db: Database
-    +add(student: Student): None
-    +get_by_id(student_id: str): Student
-    +update(student: Student): None
-    +close(): None
-  }
+    class ModuleRepository {
+      -db: Database
+      +add(module: Module): None
+      +get_by_id(module_id: str): Module
+      +close(): None
+    }
 
-  class ModuleRepository {
-    -db: Database
-    +add(module: Module): None
-    +get_by_id(module_id: str): Module
-    +close(): None
-  }
-  
-  class EnrollmentRepository {
-    -db: Database
-    +upsert(student_id: str, module_id: str, grade: float, date_passed: date): None
-    +list_by_student(student_id: str): Enrollment[*]
-    +close(): None
+    class EnrollmentRepository {
+      -db: Database
+      +upsert(student_id: str, module_id: str, grade: float, date_passed: date): None
+      +list_by_student(student_id: str): Enrollment[*]
+      +close(): None
+    }
   }
 
   StudentRepository --> Database

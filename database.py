@@ -8,9 +8,11 @@ from dataclasses import dataclass
 class Database:
     db_path: str = "dashboard.db"
     conn: Optional[sqlite3.Connection] = None
+
     def connect(self) -> None:
         try:
             self.conn = sqlite3.connect(self.db_path)
+            self.conn.execute("PRAGMA foreign_keys = ON;")
         except sqlite3.Error as e:
             logging.error(f"Database connection error: {e}.")
             self.conn = None
@@ -24,14 +26,36 @@ class Database:
             raise RuntimeError("Database not connected.")
 
         cursor = self.conn.cursor()
-        # Minimal-Beispiel: du kannst das später an dein Modell anpassen
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS student (
                 student_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                start_date TEXT NOT NULL
+                start_date TEXT NOT NULL,
+                program_id TEXT
             )
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS module (
+                module_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                ects INTEGER NOT NULL CHECK (ects >= 0)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS enrollment (
+                student_id TEXT NOT NULL,
+                module_id TEXT NOT NULL,
+                grade REAL,
+                date_passed TEXT,
+                PRIMARY KEY (student_id, module_id),
+                FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE,
+                FOREIGN KEY (module_id) REFERENCES module(module_id) ON DELETE CASCADE
+            )
+        """)
+
         self.conn.commit()
 
     def close(self) -> None:
