@@ -216,6 +216,7 @@ package "View" {
 
   TargetMonitoring ..> DashboardController
   DataCollection ..> DashboardController
+  TargetMonitoring ..> GoalEvaluation
 }
 
 ' ==========================
