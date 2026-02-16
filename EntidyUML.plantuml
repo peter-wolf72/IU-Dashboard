@@ -51,7 +51,7 @@ package "Model" {
     }
   }
 
-  Student "1" -- "0..*" Enrollment
+  Student "1" *-- "0..*" Enrollment
   Module  "1" -- "0..*" Enrollment
   Student "1" -- "1" StudyProgram : studies
   StudyProgram "1" -- "1..*" Module : contains
@@ -64,13 +64,17 @@ package "Model" {
 
   class GoalEvaluation {
     -status: Status
+    -criteria: EvaluationCriterion[*]
+  }
+
+  class EvaluationCriterion {
+    -name: str
     -value: float
     -target: float
-    -value2: float
-    -target2: float
-    -label1: str
-    -label2: str
   }
+
+  GoalEvaluation "1" *-- "0..*" EvaluationCriterion
+
 
   abstract class Goal {
     +evaluate(student: Student, program: StudyProgram): GoalEvaluation
