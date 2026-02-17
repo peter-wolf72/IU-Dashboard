@@ -1,10 +1,19 @@
 # services.py
 import datetime
-from typing import List
-from dataclasses import dataclass
+from typing import List, Optional
+from dataclasses import dataclass, field
 
 from repositories import StudentRepository, ModuleRepository, EnrollmentRepository
-from model import Student, StudyProgram, Goal, GoalEvaluation, GradeAverageGoal, DeadlineGoal, CpPaceGoal
+from model import (
+    Student,
+    Module,
+    StudyProgram,
+    Goal,
+    GoalEvaluation,
+    GradeAverageGoal,
+    DeadlineGoal,
+    CpPaceGoal,
+)
 
 @dataclass
 class DashboardService:
@@ -12,53 +21,54 @@ class DashboardService:
     module_repository: ModuleRepository
     enrollment_repository: EnrollmentRepository
 
-    def _months_since(self, start: datetime.date, now: datetime.date | None = None) -> int:
-        now = now or datetime.date.today()
-        months = (now.year - start.year) * 12 + (now.month - start.month)
-        return max(0, months)
+    # Nicht im UML explizit als Attribut gezeigt, aber notwendig, weil evaluate_student_goals(program) nicht als Param hat.
+    _program: StudyProgram = field(default_factory=lambda: StudyProgram(
+        program_id="IU-STD",
+        name="Studiengang (Default)",
+        total_ects=180,
+        duration_months=36,
+    ))
+    _goals: List[Goal] = field(default_factory=lambda: [
+        GradeAverageGoal(target_avg=2.5),
+        CpPaceGoal(target_cp_per_month=5.0),
+        DeadlineGoal(duration_months=36),
+    ])
 
-    def calc_average_grade(self, student: Student) -> float:
-        enrollments = self.enrollment_repository.list_by_student(student.student_id)
-        grades = [e.grade for e in enrollments if e.grade is not None]
-        if not grades:
-            return 0.0
-        return sum(grades) / len(grades)
+    def update_student_data(self, student: Student) -> None:
+        # Command: nur Stammdaten speichern (kein Enrichment)
+        self.student_repository.upsert(student)
 
-    def calc_time_progress(self, student: Student, program: StudyProgram) -> float:
-        months = self._months_since(student.start_date)
-        if program.duration_months <= 0:
-            return 0.0
-        return min(100.0, (months / program.duration_months) * 100.0)
+    def get_student_aggregate(self, student_id: str) -> Student:
+        student = self.student_repository.get_aggregate_by_id(student_id)
+        if student is None:
+            raise ValueError(f"Student not found: {student_id}")
+        return student
 
-    def calc_earned_ects(self, student: Student) -> int:
-        enrollments = self.enrollment_repository.list_by_student(student.student_id)
-        earned = 0
-        for e in enrollments:
-            if e.date_passed is None:
-                continue
-            mod = self.module_repository.get_by_id(e.module_id)
-            if mod is None:
-                continue
-            earned += mod.ects
-        return earned
+    def add_module_to_catalogue(self, module: Module) -> None:
+        self.module_repository.upsert(module)
 
-    def calc_cp_progress(self, student: Student, program: StudyProgram) -> float:
-        if program.total_ects <= 0:
-            return 0.0
-        earned = self.calc_earned_ects(student)
-        return min(100.0, (earned / program.total_ects) * 100.0)
+    def update_study_progress(
+        self,
+        student_id: str,
+        module_id: str,
+        grade: Optional[float],
+        date_passed: Optional[datetime.date],
+    ) -> None:
+        self.enrollment_repository.upsert(student_id, module_id, grade, date_passed)
 
-    def calc_cp_pace(self, student: Student) -> float:
-        months = max(1, self._months_since(student.start_date))
-        earned = self.calc_earned_ects(student)
-        return earned / months
+    def evaluate_student_goals(self, student: Student) -> List[GoalEvaluation]:
+        # Read: stets auf vollständigem Aggregate evaluieren (ohne student zu mutieren)
+        aggregate = student if student.enrollments else self.get_student_aggregate(student.student_id)
+        return [g.evaluate(aggregate, self._program) for g in self._goals]
 
-    def evaluate_goals(self, student: Student, program: StudyProgram, goals: List[Goal]) -> List[GoalEvaluation]:
-        return [g.evaluate(student, program, self) for g in goals]
+    def close(self) -> None:
+        # Lifecycle-Kapselung (Controller kennt nur Service; Shutdown muss irgendwo landen)
+        self.enrollment_repository.close()
+        self.module_repository.close()
+        self.student_repository.close()
 
-    def default_goals_for(self, program: StudyProgram) -> List[Goal]:
-        return [
-            GradeAverageGoal(target_avg=2.5),
-            CpPaceGoal(target_cp_per_month=5.0),
-            DeadlineGoal(duration_months=program.duration_months),
-        ]
+    def list_students(self) -> List[Student]:
+        return self.student_repository.list_all()
+
+    def list_modules(self) -> List[Module]:
+        return self.module_repository.list_all()

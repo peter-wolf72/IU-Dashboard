@@ -30,21 +30,16 @@ def main():
         enrollment_repository=enrollment_repository,
     )
 
-    # Setup controller
-    controller = DashboardController(
-        service=service,
-        student_repository=student_repository,
-        module_repository=module_repository,
-        enrollment_repository=enrollment_repository,
-    )
-    controller.load_initial_data()
+    # Setup controller (UML: injects Service only)
+    controller = DashboardController(service=service)
+    # controller.load_initial_data()  # optional: nur für Demo/Seeding; sonst Module über DB-Skript oder UI pflegen
 
     # Setup and run GUI
     main_window = tk.Tk()
     dashboard_app = DashboardGUI(master=main_window, controller=controller)
     dashboard_app.pack(fill="both", expand=True)
     dashboard_app.master.title("Dashboard GUI")
-    dashboard_app.master.geometry("900x650")
+    dashboard_app.master.geometry("1100x950")
     main_window.mainloop()
 
 # Entry point

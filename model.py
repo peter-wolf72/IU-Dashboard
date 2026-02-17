@@ -3,7 +3,7 @@
 
 import datetime
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
@@ -31,63 +31,65 @@ class StudyProgram:
 # Enrollment data model
 @dataclass(frozen=True)
 class Enrollment:
-    student_id: str
-    module_id: str
+    # UML: Enrollment hat grade/date_passed als Attribute; die Beziehung zu Module ist eine Assoziation.
+    module: Module
     grade: Optional[float] = None
     date_passed: Optional[datetime.date] = None
 
 # Student data model
-@dataclass(frozen=True)
+@dataclass
 class Student:
     student_id: str
     name: str
     start_date: datetime.date
-    # program_id ist bewusst ein Identifier (FK) und kein StudyProgram-Objekt:
-    # - referenziert StudyProgram.program_id
-    # - vermeidet, dass beim Laden eines Student automatisch ein StudyProgram mitgeladen werden muss
-    program_id: Optional[str] = None
+    enrollments: list[Enrollment] = field(default_factory=list)
 
-    # Achtung: "get_*" ist hier semantisch KEIN trivialer Getter,
-    # sondern meint fachliche, abgeleitete Kennzahlen (Berechnungen).
-    # In dieser Architektur liegen diese Berechnungen im DashboardService,
-    # weil dafür Enrollments/Module (Repos/DB) benötigt werden.
+    def _months_since_start(self, now: Optional[datetime.date] = None) -> int:
+        now = now or datetime.date.today()
+        months = (now.year - self.start_date.year) * 12 + (now.month - self.start_date.month)
+        return max(0, months)
+
     def get_average_grade(self) -> float:
-        raise NotImplementedError("Use DashboardService.calc_average_grade(student)")
+        grades = [e.grade for e in self.enrollments if e.grade is not None]
+        return (sum(grades) / len(grades)) if grades else 0.0
 
     def get_time_progress_percentage(self, duration_months: int) -> float:
-        raise NotImplementedError("Use DashboardService.calc_time_progress(student, program)")
-
-    def get_cp_progress_percentage(self, total_ects: int) -> float:
-        raise NotImplementedError("Use DashboardService.calc_cp_progress(student, program)")
+        if duration_months <= 0:
+            return 0.0
+        months = self._months_since_start()
+        return min(100.0, (months / duration_months) * 100.0)
 
     def get_earned_ects(self) -> int:
-        raise NotImplementedError("Use DashboardService.calc_earned_ects(student)")
+        return sum(e.module.ects for e in self.enrollments if e.date_passed is not None)
+
+    def get_cp_progress_percentage(self, total_ects: int) -> float:
+        if total_ects <= 0:
+            return 0.0
+        return min(100.0, (self.get_earned_ects() / total_ects) * 100.0)
 
     def get_cp_per_month(self) -> float:
-        raise NotImplementedError("Use DashboardService.calc_cp_pace(student)")
+        months = max(1, self._months_since_start())
+        return self.get_earned_ects() / months
 
+@dataclass(frozen=True)
+class EvaluationCriterion:
+    name: str
+    value: float
+    target: float
 
 @dataclass(frozen=True)
 class GoalEvaluation:
     status: Status
-    value: float
-    target: float
-    value2: float = 0.0
-    target2: float = 0.0
-    label1: str = ""
-    label2: str = ""
-    title: str = ""
-
+    criteria: list[EvaluationCriterion]
 
 class Goal(ABC):
     @abstractmethod
-    def evaluate(self, student: Student, program: StudyProgram, service: "DashboardService") -> GoalEvaluation:
+    def evaluate(self, student: Student, program: StudyProgram) -> GoalEvaluation:
         raise NotImplementedError
 
     @abstractmethod
     def get_title(self) -> str:
         raise NotImplementedError
-
 
 @dataclass(frozen=True)
 class GradeAverageGoal(Goal):
@@ -96,24 +98,21 @@ class GradeAverageGoal(Goal):
     def get_title(self) -> str:
         return "Notenschnitt"
 
-    def evaluate(self, student: Student, program: StudyProgram, service: "DashboardService") -> GoalEvaluation:
-        avg = service.calc_average_grade(student)
-        # kleiner = besser; gelb/rot heuristisch
+    def evaluate(self, student: Student, program: StudyProgram) -> GoalEvaluation:
+        avg = student.get_average_grade()
         if avg <= self.target_avg:
             status = Status.GREEN
         elif avg <= self.target_avg + 0.3:
             status = Status.YELLOW
         else:
             status = Status.RED
+
         return GoalEvaluation(
             status=status,
-            value=avg,
-            target=self.target_avg,
-            label1="Ø Note",
-            label2="Ziel",
-            title=self.get_title(),
+            criteria=[
+                EvaluationCriterion(name=f"{self.get_title()} – Ø Note", value=avg, target=self.target_avg),
+            ],
         )
-
 
 @dataclass(frozen=True)
 class DeadlineGoal(Goal):
@@ -122,12 +121,11 @@ class DeadlineGoal(Goal):
     def get_title(self) -> str:
         return "Deadline / Plan"
 
-    def evaluate(self, student: Student, program: StudyProgram, service: "DashboardService") -> GoalEvaluation:
-        time_pct = service.calc_time_progress(student, program)
-        cp_pct = service.calc_cp_progress(student, program)
-
-        # Erwartung: CP% sollte ungefähr Time% halten (mit Toleranz)
+    def evaluate(self, student: Student, program: StudyProgram) -> GoalEvaluation:
+        time_pct = student.get_time_progress_percentage(self.duration_months)
+        cp_pct = student.get_cp_progress_percentage(program.total_ects)
         delta = cp_pct - time_pct
+
         if delta >= 0:
             status = Status.GREEN
         elif delta >= -10:
@@ -137,15 +135,11 @@ class DeadlineGoal(Goal):
 
         return GoalEvaluation(
             status=status,
-            value=cp_pct,
-            target=time_pct,
-            value2=delta,
-            target2=0.0,
-            label1="CP%",
-            label2="Time%",
-            title=self.get_title(),
+            criteria=[
+                EvaluationCriterion(name=f"{self.get_title()} – CP%", value=cp_pct, target=time_pct),
+                EvaluationCriterion(name=f"{self.get_title()} – Delta(CP%-Time%)", value=delta, target=0.0),
+            ],
         )
-
 
 @dataclass(frozen=True)
 class CpPaceGoal(Goal):
@@ -154,8 +148,8 @@ class CpPaceGoal(Goal):
     def get_title(self) -> str:
         return "CP Pace"
 
-    def evaluate(self, student: Student, program: StudyProgram, service: "DashboardService") -> GoalEvaluation:
-        pace = service.calc_cp_pace(student)
+    def evaluate(self, student: Student, program: StudyProgram) -> GoalEvaluation:
+        pace = student.get_cp_per_month()
         if pace >= self.target_cp_per_month:
             status = Status.GREEN
         elif pace >= self.target_cp_per_month * 0.8:
@@ -165,9 +159,7 @@ class CpPaceGoal(Goal):
 
         return GoalEvaluation(
             status=status,
-            value=pace,
-            target=self.target_cp_per_month,
-            label1="CP/Monat",
-            label2="Ziel",
-            title=self.get_title(),
+            criteria=[
+                EvaluationCriterion(name=f"{self.get_title()} – CP/Monat", value=pace, target=self.target_cp_per_month),
+            ],
         )

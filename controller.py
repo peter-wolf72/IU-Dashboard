@@ -1,55 +1,47 @@
 # controller.py
 import datetime
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import List, Optional
 
 from services import DashboardService
-from model import Student, StudyProgram, GoalEvaluation, Module
-from repositories import StudentRepository, ModuleRepository, EnrollmentRepository
+from model import Student, Module, GoalEvaluation
 
 @dataclass
 class DashboardController:
     service: DashboardService
-    student_repository: StudentRepository
-    module_repository: ModuleRepository
-    enrollment_repository: EnrollmentRepository
-
-    # minimaler Program-Kontext (kann später via Repository kommen)
-    program: StudyProgram = StudyProgram(
-        program_id="IU-STD",
-        name="Studiengang (Default)",
-        total_ects=180,
-        duration_months=36,
-    )
 
     def load_initial_data(self) -> None:
-        # Seed-Beispiele (idempotent via upsert in ModuleRepository.add)
-        self.module_repository.add(Module(module_id="M101", title="Beispielmodul 1", ects=5))
-        self.module_repository.add(Module(module_id="M102", title="Beispielmodul 2", ects=5))
+        # Seed-Beispiele (kann später durch DB-Skript ersetzt werden)
+        self.service.add_module_to_catalogue(Module(module_id="M101", title="Beispielmodul 1", ects=5))
+        self.service.add_module_to_catalogue(Module(module_id="M102", title="Beispielmodul 2", ects=5))
 
-    def save_student(self, student: Student) -> None:
-        # Konsistenzregel: Student gehört zum im Controller aktiven StudyProgram.
-        if student.program_id != self.program.program_id:
-            student = replace(student, program_id=self.program.program_id)
-        self.student_repository.upsert(student)
-    def compute_overview(self, student_id: str) -> List[GoalEvaluation]:
-        student = self.student_repository.get_by_id(student_id)
-        if student is None:
-            return []
-        goals = self.service.default_goals_for(self.program)
-        return self.service.evaluate_goals(student, self.program, goals)
+    def process_student_data(self, student: Student) -> None:
+        self.service.update_student_data(student)
 
-    def add_or_update_enrollment(
+    def process_module_data(self, module: Module) -> None:
+        self.service.add_module_to_catalogue(module)
+
+    def process_enrollment_data(
         self,
-        student_id: str,
-        module_id: str,
-        grade: Optional[float],
-        date_passed: Optional[datetime.date],
+        student: Student,
+        module: Module,
+        grade: Optional[float] = None,
+        date: Optional[datetime.date] = None,
     ) -> None:
-        self.enrollment_repository.upsert(student_id, module_id, grade, date_passed)
+        self.service.update_study_progress(student.student_id, module.module_id, grade, date)
+
+    def refresh_dashboard_stats(self, student: Student) -> List[GoalEvaluation]:
+        self.service.update_student_data(student)
+        return self.service.evaluate_student_goals(student)
 
     def shutdown(self) -> None:
-        # Controller bleibt DB-agnostisch; Repos kapseln die DB.
-        self.enrollment_repository.close()
-        self.module_repository.close()
-        self.student_repository.close()
+        self.service.close()
+
+    def refresh_student_list(self) -> List[Student]:
+        return self.service.list_students()
+
+    def get_student_aggregate(self, student_id: str) -> Student:
+        return self.service.get_student_aggregate(student_id)
+
+    def refresh_module_list(self) -> List[Module]:
+        return self.service.list_modules()

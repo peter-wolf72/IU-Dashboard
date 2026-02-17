@@ -113,6 +113,9 @@ package "Model" {
     +add_module_to_catalogue(module: Module): None
     +update_study_progress(student_id: str, module_id: str, grade: float, date_passed: date): None
     +evaluate_student_goals(student: Student): GoalEvaluation[*]
+    +list_students(): Student[*]
+    +get_student_aggregate(student_id: str): Student
+    +list_modules(): Module[*]
   }
   together {
     ' --- Persistence ---
@@ -127,18 +130,18 @@ package "Model" {
     class StudentRepository {
       -db: Database
       +upsert(student: Student): None
-      +get_by_id(student_id: str): Student
+      +get_aggregate_by_id(student_id: str): Student
+      +list_all(): Student[*]
       +close(): None
     }
     class ModuleRepository {
       -db: Database
       +upsert(module: Module): None
       +get_by_id(module_id: str): Module
+      +list_all(): Module[*]
       +close(): None
     }
 
-    'note top of ModuleRepository: Modules are set up once via database script\nand are read-only afterwards.
-    
     class EnrollmentRepository {
       -db: Database
       +upsert(student_id: str, module_id: str, grade: float, date_passed: date): None
@@ -177,6 +180,9 @@ package "Controller" {
     +process_module_data(module: Module): None
     +process_enrollment_data(student: Student, module: Module, grade=None, date=None): None
     +refresh_dashboard_stats(student: Student): GoalEvaluation[*]
+    +refresh_student_list(): Student[*]
+    +get_student_aggregate(student_id: str): Student
+    
 
     +shutdown(): None
   }
@@ -210,6 +216,8 @@ package "View" {
   class DataCollection {
     -controller: DashboardController
     +submit_data(): None
+    +refresh_student_list(): None
+    +on_student_selected(): None
   }
 
   DashboardGUI o-- TargetMonitoring
