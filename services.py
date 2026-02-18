@@ -57,9 +57,13 @@ class DashboardService:
         self.enrollment_repository.upsert(student_id, module_id, grade, date_passed)
 
     def evaluate_student_goals(self, student: Student) -> List[GoalEvaluation]:
-        # Read: stets auf vollständigem Aggregate evaluieren (ohne student zu mutieren)
-        aggregate = student if student.enrollments else self.get_student_aggregate(student.student_id)
-        return [g.evaluate(aggregate, self._program) for g in self._goals]
+        """
+        Read: delegiert an das Rich Domain Model (Student.evaluate_all_goals).
+        Das Aggregat kennt seine Goals und evaluiert sie selbst.
+        """
+        # Aggregate mit Goals laden (falls noch nicht geladen)
+        aggregate = student if student.goals else self.get_student_aggregate(student.student_id)
+        return aggregate.evaluate_all_goals(self._program)
 
     def close(self) -> None:
         # Lifecycle-Kapselung (Controller kennt nur Service; Shutdown muss irgendwo landen)
@@ -72,3 +76,14 @@ class DashboardService:
 
     def list_modules(self) -> List[Module]:
         return self.module_repository.list_all()
+
+    def update_student_goals(self, student_id: str, duration_months: int, target_avg: float, target_cp_per_month: float) -> None:
+        """
+        Erstellt Goal-Objekte aus den UI-Werten und speichert sie via Repository.
+        """
+        goals: List[Goal] = [
+            GradeAverageGoal(target_avg=target_avg),
+            CpPaceGoal(target_cp_per_month=target_cp_per_month),
+            DeadlineGoal(duration_months=duration_months),
+        ]
+        self.student_repository.save_goals(student_id, goals)

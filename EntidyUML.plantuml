@@ -24,13 +24,16 @@ package "Model" {
       -name: str
       -start_date: date
       -enrollments: Enrollment[*]
+      -goals: Goal[*]
 
       +get_average_grade(): float
       +get_time_progress_percentage(duration_months: int): float
       +get_cp_progress_percentage(total_ects: int): float
       +get_earned_ects(): int
       +get_cp_per_month(): float
-    }
+
+      ' Central Dashboard Logic (Rich Domain Entry Point)
+      **+evaluate_all_goals(program: StudyProgram): GoalEvaluation[*]**    }
 
     class Enrollment {
       -grade: float
@@ -116,6 +119,7 @@ package "Model" {
     +list_students(): Student[*]
     +get_student_aggregate(student_id: str): Student
     +list_modules(): Module[*]
+    +update_student_goals(student_id: str, goals: Goal[*]): None
   }
   together {
     ' --- Persistence ---
@@ -130,8 +134,9 @@ package "Model" {
     class StudentRepository {
       -db: Database
       +upsert(student: Student): None
-      +get_aggregate_by_id(student_id: str): Student
+      +get_aggregate_by_id(student_id: str): Student # Loads Student, Enrollments and Goals
       +list_all(): Student[*]
+      +save_goals(student_id: str, goals: Goal[*]): None
       +close(): None
     }
     class ModuleRepository {
@@ -155,6 +160,8 @@ package "Model" {
   EnrollmentRepository --> Database
 
   StudentRepository ..> Student
+  StudentRepository ..> StudyProgram
+  StudentRepository ..> Goal
   ModuleRepository ..> Module
   EnrollmentRepository ..> Enrollment
 
@@ -182,6 +189,8 @@ package "Controller" {
     +refresh_dashboard_stats(student: Student): GoalEvaluation[*]
     +refresh_student_list(): Student[*]
     +get_student_aggregate(student_id: str): Student
+    +process_goal_data(student_id: str, target_duration: int, target_avg: float, target_cp: float): None
+    
     
 
     +shutdown(): None

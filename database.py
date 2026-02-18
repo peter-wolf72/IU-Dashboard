@@ -56,6 +56,16 @@ class Database:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS student_goals (
+                student_id TEXT NOT NULL,
+                goal_type TEXT NOT NULL,
+                value REAL NOT NULL,
+                PRIMARY KEY (student_id, goal_type),
+                FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE
+            )
+        """)
+
         self.conn.commit()
 
     def close(self) -> None:

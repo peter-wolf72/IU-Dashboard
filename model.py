@@ -43,6 +43,7 @@ class Student:
     name: str
     start_date: datetime.date
     enrollments: list[Enrollment] = field(default_factory=list)
+    goals: list["Goal"] = field(default_factory=list)
 
     def _months_since_start(self, now: Optional[datetime.date] = None) -> int:
         now = now or datetime.date.today()
@@ -70,6 +71,13 @@ class Student:
     def get_cp_per_month(self) -> float:
         months = max(1, self._months_since_start())
         return self.get_earned_ects() / months
+
+    def evaluate_all_goals(self, program: StudyProgram) -> list["GoalEvaluation"]:
+        """
+        Rich Domain Model: zentraler Evaluierungspunkt.
+        Evaluiert alle Goals des Students gegen das Programm.
+        """
+        return [goal.evaluate(self, program) for goal in self.goals]
 
 @dataclass(frozen=True)
 class EvaluationCriterion:

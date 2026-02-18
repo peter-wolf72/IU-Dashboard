@@ -30,6 +30,20 @@ class DashboardController:
     ) -> None:
         self.service.update_study_progress(student.student_id, module.module_id, grade, date)
 
+    def process_goal_data(self, student_id: str, target_duration: int, target_avg: float, target_cp: float) -> None:
+        """
+        Validiert Goal-Daten und delegiert an Service.
+        """
+        # Grobe Validierung
+        if target_duration <= 0:
+            raise ValueError("Dauer in Monaten muss > 0 sein.")
+        if target_avg <= 0:
+            raise ValueError("Notendurchschnitt muss > 0 sein.")
+        if target_cp < 0:
+            raise ValueError("Arbeitstempo darf nicht negativ sein.")
+
+        self.service.update_student_goals(student_id, target_duration, target_avg, target_cp)
+
     def refresh_dashboard_stats(self, student: Student) -> List[GoalEvaluation]:
         self.service.update_student_data(student)
         return self.service.evaluate_student_goals(student)

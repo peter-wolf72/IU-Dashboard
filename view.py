@@ -51,6 +51,7 @@ class DataCollection(ttk.Frame):
         super().__init__(self.master)
         self._student_rows: dict[str, Student] = {}
         self._modules_by_id: dict[str, Module] = {}
+        self._goal_settings: dict[str, float | int] = {}
         self.render()
 
     def render(self) -> None:
@@ -58,22 +59,47 @@ class DataCollection(ttk.Frame):
         self.name_var = tk.StringVar()
         self.start_var = tk.StringVar(value=datetime.date.today().isoformat())
 
-        frm = ttk.Frame(self)
-        frm.pack(fill="x", padx=12, pady=12)
+        # --- NEU: Zwei Kacheln nebeneinander (Student | Zieldaten) ---
+        top_tiles = ttk.Frame(self)
+        top_tiles.pack(fill="x", padx=12, pady=12)
+        top_tiles.grid_columnconfigure(0, weight=1)
+        top_tiles.grid_columnconfigure(1, weight=1)
 
-        ttk.Label(frm, text="Student-ID").grid(row=0, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=self.student_id_var, width=24).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        student_tile = ttk.LabelFrame(top_tiles, text="Persönlichen Daten")
+        student_tile.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
-        ttk.Label(frm, text="Name").grid(row=1, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(frm, textvariable=self.name_var, width=32).grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
+        ttk.Label(student_tile, text="Student-ID").grid(row=0, column=0, sticky="w", padx=8, pady=(8, 4))
+        ttk.Entry(student_tile, textvariable=self.student_id_var, width=24).grid(row=0, column=1, sticky="w", padx=(0, 8), pady=(8, 4))
 
-        ttk.Label(frm, text="Startdatum (YYYY-MM-DD)").grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(frm, textvariable=self.start_var, width=24).grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
+        ttk.Label(student_tile, text="Name").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        ttk.Entry(student_tile, textvariable=self.name_var, width=32).grid(row=1, column=1, sticky="w", padx=(0, 8), pady=4)
 
-        # Wiederhergestellt: Student speichern
-        btns = ttk.Frame(self)
-        btns.pack(fill="x", padx=12, pady=(0, 12))
-        ttk.Button(btns, text="Student speichern", command=self.submit_data).pack(side="left")
+        ttk.Label(student_tile, text="Startdatum (YYYY-MM-DD)").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        ttk.Entry(student_tile, textvariable=self.start_var, width=24).grid(row=2, column=1, sticky="w", padx=(0, 8), pady=4)
+
+        ttk.Button(student_tile, text="Student speichern", command=self.submit_data).grid(
+            row=3, column=1, sticky="e", padx=(0, 8), pady=(8, 8)
+        )
+
+        goals_tile = ttk.LabelFrame(top_tiles, text="Zieldaten Studium")
+        goals_tile.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+
+        self.goal_duration_var = tk.StringVar(value="")
+        self.goal_avg_var = tk.StringVar(value="")
+        self.goal_pace_var = tk.StringVar(value="")
+
+        ttk.Label(goals_tile, text="Dauer in Monaten").grid(row=0, column=0, sticky="w", padx=8, pady=(8, 4))
+        ttk.Entry(goals_tile, textvariable=self.goal_duration_var, width=12).grid(row=0, column=1, sticky="w", padx=(0, 8), pady=(8, 4))
+
+        ttk.Label(goals_tile, text="Notendurchschnitt (Ziel)").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        ttk.Entry(goals_tile, textvariable=self.goal_avg_var, width=12).grid(row=1, column=1, sticky="w", padx=(0, 8), pady=4)
+
+        ttk.Label(goals_tile, text="Arbeitstempo CP/Monat").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        ttk.Entry(goals_tile, textvariable=self.goal_pace_var, width=12).grid(row=2, column=1, sticky="w", padx=(0, 8), pady=4)
+
+        ttk.Button(goals_tile, text="Ziele speichern", command=self._save_goal_settings).grid(
+            row=3, column=1, sticky="e", padx=(0, 8), pady=(8, 8)
+        )
 
         # --- Modul anlegen/aktualisieren (Katalog) ---
         self.catalog_module_id_var = tk.StringVar()
@@ -197,13 +223,15 @@ class DataCollection(ttk.Frame):
         sel = self.student_tree.selection()
         if not sel:
             self._clear_enrollments_view()
+            self._clear_goal_fields()
             return
         s = self._student_rows.get(sel[0])
         if s is None:
             self._clear_enrollments_view()
+            self._clear_goal_fields()
             return
 
-        # Query: vollständiges Aggregate laden (ohne Speichern/Enrichment)
+        # Query: vollständiges Aggregate laden (inkl. Enrollments UND Goals)
         aggregate = self.controller.get_student_aggregate(s.student_id)
 
         self.student_id_var.set(aggregate.student_id)
@@ -211,10 +239,43 @@ class DataCollection(ttk.Frame):
         self.start_var.set(aggregate.start_date.isoformat())
 
         self._render_enrollments(aggregate)
+        self._display_goals_from_student(aggregate)
+
+    def _display_goals_from_student(self, student: Student) -> None:
+        """
+        Extrahiert Zielwerte aus student.goals und befüllt die Ziel-Felder.
+        """
+        # Default-Werte (falls keine Goals gesetzt)
+        duration = ""
+        target_avg = ""
+        target_pace = ""
+
+        # Goals durchsuchen
+        from model import DeadlineGoal, GradeAverageGoal, CpPaceGoal
+        for goal in student.goals:
+            if isinstance(goal, DeadlineGoal):
+                duration = str(goal.duration_months)
+            elif isinstance(goal, GradeAverageGoal):
+                target_avg = str(goal.target_avg).replace(".", ",")
+            elif isinstance(goal, CpPaceGoal):
+                target_pace = str(goal.target_cp_per_month).replace(".", ",")
+
+        self.goal_duration_var.set(duration)
+        self.goal_avg_var.set(target_avg)
+        self.goal_pace_var.set(target_pace)
+
+    def _clear_goal_fields(self) -> None:
+        """
+        Leert die Ziel-Felder (z.B. bei keiner Student-Auswahl).
+        """
+        self.goal_duration_var.set("")
+        self.goal_avg_var.set("")
+        self.goal_pace_var.set("")
 
     def submit_data(self) -> None:
         self.controller.process_student_data(self._current_student())
         self.refresh_student_list()
+        messagebox.showinfo("Student gespeichert", "Studentendaten wurden erfolgreich übernommen.")
 
     # NEU: Parser (werden in _save_enrollment genutzt)
     def _parse_grade(self, text: str) -> Optional[float]:
@@ -315,6 +376,37 @@ class DataCollection(ttk.Frame):
 
         self.controller.process_module_data(Module(module_id=module_id, title=title, ects=ects))
         self.refresh_module_dropdown()
+        messagebox.showinfo("Module gespeichert", "Moduldaten wurden erfolgreich übernommen.")
+
+    def _save_goal_settings(self) -> None:
+        """
+        Validiert Eingabewerte und delegiert an Controller.
+        """
+        try:
+            duration = int((self.goal_duration_var.get() or "").strip())
+            target_avg = float((self.goal_avg_var.get() or "").strip().replace(",", "."))
+            target_pace = float((self.goal_pace_var.get() or "").strip().replace(",", "."))
+        except ValueError:
+            messagebox.showerror(
+                "Eingabefehler",
+                "Bitte gültige Zahlen eingeben.\n"
+                "Beispiele: Dauer=36, Notenziel=2,5, CP/Monat=5,0",
+            )
+            return
+
+        # Hole die aktuelle Student-ID
+        student_id = self.student_id_var.get().strip()
+        if not student_id:
+            messagebox.showerror("Eingabefehler", "Bitte zuerst eine Student-ID eingeben.")
+            return
+
+        try:
+            self.controller.process_goal_data(student_id, duration, target_avg, target_pace)
+            messagebox.showinfo("Ziele gespeichert", "Zieldaten wurden erfolgreich gespeichert.")
+        except ValueError as e:
+            messagebox.showerror("Eingabefehler", str(e))
+        except Exception as e:
+            messagebox.showerror("Fehler", f"Speichern fehlgeschlagen: {e}")
 
 @dataclass
 class DashboardGUI(tk.Frame):

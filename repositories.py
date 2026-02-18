@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 from database import Database
-from model import Student, Module, Enrollment
+from model import Student, Module, Enrollment, Goal, GradeAverageGoal, DeadlineGoal, CpPaceGoal
 
 @dataclass
 class StudentRepository:
@@ -31,7 +31,7 @@ class StudentRepository:
 
     def get_aggregate_by_id(self, student_id: str) -> Student | None:
         """
-        UML: liefert das Student-Aggregat inkl. Enrollment[*] (read model).
+        UML: liefert das Student-Aggregat inkl. Enrollment[*] und Goals[*] (read model).
         """
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
@@ -48,6 +48,7 @@ class StudentRepository:
         sid, name, start_date_str = row
         start_date = datetime.date.fromisoformat(start_date_str)
 
+        # Enrollments laden (wie bisher)
         cursor.execute(
             """
             SELECT
@@ -70,8 +71,55 @@ class StudentRepository:
                 )
             )
 
-        logging.info("Student aggregate loaded: %s (enrollments=%d)", sid, len(enrollments))
-        return Student(student_id=sid, name=name, start_date=start_date, enrollments=enrollments)
+        # Goals laden aus student_goals Tabelle
+        cursor.execute(
+            "SELECT goal_type, value FROM student_goals WHERE student_id=?",
+            (student_id,),
+        )
+        goals: List[Goal] = []
+        for goal_type, value in cursor.fetchall():
+            if goal_type == "GradeAverageGoal":
+                goals.append(GradeAverageGoal(target_avg=float(value)))
+            elif goal_type == "CpPaceGoal":
+                goals.append(CpPaceGoal(target_cp_per_month=float(value)))
+            elif goal_type == "DeadlineGoal":
+                goals.append(DeadlineGoal(duration_months=int(value)))
+
+        logging.info("Student aggregate loaded: %s (enrollments=%d, goals=%d)", sid, len(enrollments), len(goals))
+        return Student(student_id=sid, name=name, start_date=start_date, enrollments=enrollments, goals=goals)
+
+    def save_goals(self, student_id: str, goals: List[Goal]) -> None:
+        """
+        Speichert Goal-Objekte für einen Student in der student_goals Tabelle.
+        Löscht alte Goals und fügt neue ein.
+        """
+        if self.database.conn is None:
+            raise RuntimeError("Database not connected")
+
+        cursor = self.database.conn.cursor()
+
+        # Alte Goals für diesen Student löschen
+        cursor.execute("DELETE FROM student_goals WHERE student_id=?", (student_id,))
+
+        # Neue Goals speichern
+        for goal in goals:
+            goal_type = goal.__class__.__name__
+            if isinstance(goal, GradeAverageGoal):
+                value = goal.target_avg
+            elif isinstance(goal, CpPaceGoal):
+                value = goal.target_cp_per_month
+            elif isinstance(goal, DeadlineGoal):
+                value = goal.duration_months
+            else:
+                continue
+
+            cursor.execute(
+                "INSERT INTO student_goals (student_id, goal_type, value) VALUES (?, ?, ?)",
+                (student_id, goal_type, value),
+            )
+
+        self.database.conn.commit()
+        logging.info(f"Goals for student {student_id} saved: {len(goals)} goals.")
 
     def list_all(self) -> List[Student]:
         if self.database.conn is None:
