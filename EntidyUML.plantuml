@@ -214,19 +214,26 @@ package "View" {
 
     +create_widgets(): None
     +on_window_close(): None
+    **+sync_student_dropdown(): None  ' Orchestriert Sync zwischen Tabs**
   }
 
   class TargetMonitoring {
     -controller: DashboardController
+    -student_dropdown: ttk.Combobox
+    -student_rows: dict[str, str]  ' Mapping: display-string -> student_id
+
     +render(): None
     +update_overview(data: GoalEvaluation[*]): None
+    **+refresh_student_dropdown(): None  ' Lädt aktuelle Studenten aus Controller**
+    **+on_student_selected(_evt): None  ' Event-Handler für Dropdown-Auswahl**
   }
 
   class DataCollection {
     -controller: DashboardController
+    # ...existing...
+
     +submit_data(): None
-    +refresh_student_list(): None
-    +on_student_selected(): None
+    # Nach Eintrag wird sync aufgerufen
   }
 
   DashboardGUI o-- TargetMonitoring
@@ -238,6 +245,8 @@ package "View" {
   TargetMonitoring ..> DashboardController
   DataCollection ..> DashboardController
   TargetMonitoring ..> GoalEvaluation
+  
+  **DashboardGUI ..> TargetMonitoring : sync_student_dropdown()**
 }
 
 ' ==========================

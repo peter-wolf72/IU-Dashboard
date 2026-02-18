@@ -40,6 +40,7 @@ def main():
     dashboard_app.pack(fill="both", expand=True)
     dashboard_app.master.title("Dashboard GUI")
     dashboard_app.master.geometry("1100x950")
+    logging.info("Starting Dashboard application.")
     main_window.mainloop()
 
 # Entry point

@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox
 import datetime
 from dataclasses import dataclass
 from typing import List, Optional
+import logging
 
 from controller import DashboardController
 from model import Student, GoalEvaluation, Module
@@ -16,36 +17,302 @@ class TargetMonitoring(ttk.Frame):
 
     def __post_init__(self) -> None:
         super().__init__(self.master)
+        self._tiles: dict[str, ttk.LabelFrame] = {}
+        self._tile_labels: dict[str, dict[str, tk.Label]] = {}
+        self._tile_bars: dict[str, ttk.Progressbar] = {}
+        self._student_rows: dict[str, str] = {}  # mapping display-string -> student_id
         self.render()
 
     def render(self) -> None:
-        self.tree = ttk.Treeview(self, columns=("status", "criterion", "value", "target"), show="headings")
-        self.tree.heading("status", text="Status")
-        self.tree.heading("criterion", text="Kriterium")
-        self.tree.heading("value", text="Wert")
-        self.tree.heading("target", text="Ziel")
-        self.tree.pack(fill="both", expand=True, padx=12, pady=12)
+        # --- Header mit Student-Dropdown ---
+        header = ttk.Frame(self)
+        header.pack(fill="x", padx=24, pady=12)
 
-    def update_overview(self, data: List[GoalEvaluation]) -> None:
-        for iid in self.tree.get_children():
-            self.tree.delete(iid)
+        ttk.Label(header, text="Student:", font=("", 10)).pack(side="left", padx=(0, 8))
 
-        if not data:
-            self.tree.insert("", "end", values=("—", "Kein Student/keine Daten", "", ""))
+        self.student_dropdown = ttk.Combobox(
+            header,
+            state="readonly",
+            width=40,
+            font=("", 10),
+        )
+        self.student_dropdown.pack(side="left", fill="x", expand=True)
+        self.student_dropdown.bind("<<ComboboxSelected>>", self.on_student_selected)
+
+        # --- Container für 3 Kacheln in einer Zeile ---
+        container = ttk.Frame(self)
+        container.pack(fill="both", expand=True, padx=24, pady=24)
+        container.grid_columnconfigure(0, weight=1, uniform="tile")
+        container.grid_columnconfigure(1, weight=1, uniform="tile")
+        container.grid_columnconfigure(2, weight=1, uniform="tile")
+
+        # Kachel 1: Notendurchschnitt
+        tile_grade = ttk.LabelFrame(container, text="Notendurchschnitt", padding=16)
+        tile_grade.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        self._tiles["grade"] = tile_grade
+
+        # Captions OHNE Farbe, zentriert oben
+        lbl_grade_actual_caption = tk.Label(tile_grade, text="Aktuell:", font=("", 10))
+        lbl_grade_actual_caption.pack(anchor="center")
+        lbl_grade_actual = tk.Label(tile_grade, text="—", font=("", 10))
+        lbl_grade_actual.pack(anchor="center")
+
+        lbl_grade_target_caption = tk.Label(tile_grade, text="Ziel:", font=("", 10))
+        lbl_grade_target_caption.pack(anchor="center", pady=(8, 0))
+        lbl_grade_target = tk.Label(tile_grade, text="—", font=("", 10))
+        lbl_grade_target.pack(anchor="center")
+
+        # Inner Frame für farbigen Content
+        grade_content = tk.Frame(tile_grade, bg="white")
+        grade_content.pack(pady=16, fill="both", expand=True)
+
+        lbl_grade_big = tk.Label(grade_content, text="—", font=("", 48, "bold"), fg="red", bg="white")
+        lbl_grade_big.pack(pady=16, anchor="center")
+
+        self._tile_labels["grade"] = {
+            "actual": lbl_grade_actual,
+            "target": lbl_grade_target,
+            "big": lbl_grade_big,
+            "content_frame": grade_content,
+        }
+
+        # Kachel 2: Bachelorabschluss / Deadline
+        tile_deadline = ttk.LabelFrame(container, text="Bachelorabschluss", padding=16)
+        tile_deadline.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
+        self._tiles["deadline"] = tile_deadline
+
+        lbl_deadline_time = tk.Label(tile_deadline, text="Zeitfortschritt: —", font=("", 10), anchor="center")
+        lbl_deadline_time.pack(anchor="center")
+        lbl_deadline_cp = tk.Label(tile_deadline, text="CP-Fortschritt: —", font=("", 10), anchor="center")
+        lbl_deadline_cp.pack(anchor="center", pady=(4, 0))
+
+        # Inner Frame für Balken (farbig)
+        deadline_content = tk.Frame(tile_deadline, bg="white")
+        deadline_content.pack(pady=12, fill="both", expand=True)
+
+        bar_frame = tk.Frame(deadline_content)
+        bar_frame.pack(expand=True)  # expand=True für vertikale Zentrierung
+
+        lbl_bar_left = tk.Label(bar_frame, text="Zeit", font=("", 9), bg="white")
+        lbl_bar_left.grid(row=0, column=0, padx=4)
+        bar_time = ttk.Progressbar(bar_frame, orient="vertical", length=80, mode="determinate")
+        bar_time.grid(row=1, column=0, padx=4)
+
+        lbl_bar_right = tk.Label(bar_frame, text="CP", font=("", 9), bg="white")
+        lbl_bar_right.grid(row=0, column=1, padx=4)
+        bar_cp = ttk.Progressbar(bar_frame, orient="vertical", length=80, mode="determinate")
+        bar_cp.grid(row=1, column=1, padx=4)
+
+        self._tile_labels["deadline"] = {
+            "time": lbl_deadline_time,
+            "cp": lbl_deadline_cp,
+            "content_frame": deadline_content,
+        }
+        self._tile_bars["deadline_time"] = bar_time
+        self._tile_bars["deadline_cp"] = bar_cp
+
+        # Kachel 3: Arbeitstempo
+        tile_pace = ttk.LabelFrame(container, text="Arbeitstempo", padding=16)
+        tile_pace.grid(row=0, column=2, sticky="nsew", padx=8, pady=8)
+        self._tiles["pace"] = tile_pace
+
+        lbl_pace_actual = tk.Label(tile_pace, text="Ist: — CP/Monat", font=("", 10), anchor="center")
+        lbl_pace_actual.pack(anchor="center")
+        lbl_pace_target = tk.Label(tile_pace, text="Soll: — CP/Monat", font=("", 10), anchor="center")
+        lbl_pace_target.pack(anchor="center", pady=(4, 0))
+
+        # Inner Frame für Pfeil (farbig)
+        pace_content = tk.Frame(tile_pace, bg="white")
+        pace_content.pack(pady=16, fill="both", expand=True)
+
+        lbl_pace_arrow = tk.Label(pace_content, text="—", font=("", 48), fg="black", bg="white")
+        lbl_pace_arrow.pack(expand=True)  # expand=True für vertikale UND horizontale Zentrierung
+
+        self._tile_labels["pace"] = {
+            "actual": lbl_pace_actual,
+            "target": lbl_pace_target,
+            "arrow": lbl_pace_arrow,
+            "content_frame": pace_content,
+        }
+
+        # JETZT: Dropdown füllen (nach Kacheln initialisiert)
+        self.refresh_student_dropdown()
+
+    def refresh_student_dropdown(self) -> None:
+        """
+        Lädt aktuelle Studentenliste und befüllt das Dropdown.
+        Wird aufgerufen nach Student anlegen oder beim Öffnen des Tabs.
+        """
+        students = self.controller.refresh_student_list()
+        self._student_rows.clear()
+
+        # Anzeige-Strings: "Student-ID – Name"
+        values = []
+        for s in students:
+            display = f"{s.student_id} – {s.name}"
+            values.append(display)
+            self._student_rows[display] = s.student_id
+
+        self.student_dropdown["values"] = values
+
+        # Aktuell selektierte ID beibehalten (falls vorhanden)
+        current_display = self.student_dropdown.get()
+        if current_display and current_display in self._student_rows:
+            self.student_dropdown.set(current_display)
+        else:
+            self.student_dropdown.set("")
+            self._clear_tiles()
+
+    def on_student_selected(self, _evt=None) -> None:
+        """
+        Event-Handler: Wenn Student im Dropdown ausgewählt wird,
+        lade sein Aggregat und zeige die Ziele an.
+        """
+        display = self.student_dropdown.get().strip()
+        if not display or display not in self._student_rows:
+            self._clear_tiles()
             return
 
+        student_id = self._student_rows[display]
+
+        try:
+            # Query: Aggregat laden (inkl. Goals)
+            student = self.controller.get_student_aggregate(student_id)
+            # Evaluiere Goals
+            data = self.controller.refresh_dashboard_stats(student)
+            # Update Kacheln
+            self.update_overview(data)
+        except Exception as e:
+            logging.error(f"Fehler beim Laden des Students: {e}")
+            self._clear_tiles()
+
+    def update_overview(self, data: List[GoalEvaluation]) -> None:
+        """
+        Aktualisiert die 3 Tiles basierend auf den GoalEvaluation-Objekten.
+        RDM-konform: View kennt nur Darstellung (Farbe, Werte); Logik liegt in Goal.evaluate().
+        """
+        if not data:
+            self._clear_tiles()
+            return
+
+        # Mapping: Erkenne Goal anhand criteria-Namen (alternativ: Goal-Titel-Matching)
+        from model import Status
+
         for ev in data:
-            for c in ev.criteria:
-                self.tree.insert(
-                    "",
-                    "end",
-                    values=(str(ev.status), c.name, f"{c.value:.2f}", f"{c.target:.2f}"),
-                )
+            if not ev.criteria:
+                continue
+
+            first_crit = ev.criteria[0]
+            name_lower = first_crit.name.lower()
+
+            # 1) Notendurchschnitt
+            if "notenschnitt" in name_lower:
+                actual = first_crit.value
+                target = first_crit.target
+                self._tile_labels["grade"]["actual"].config(text=f"{actual:.2f}")
+                self._tile_labels["grade"]["target"].config(text=f"≤ {target:.2f}")
+                self._tile_labels["grade"]["big"].config(text=f"{actual:.1f}")
+                self._set_tile_color("grade", ev.status)
+
+            # 2) Deadline / Plan
+            elif "deadline" in name_lower or "cp%" in name_lower:
+                # ev hat 2 criteria: CP%, Delta
+                cp_val = ev.criteria[0].value
+                cp_target = ev.criteria[0].target
+                delta_val = ev.criteria[1].value if len(ev.criteria) > 1 else 0.0
+
+                self._tile_labels["deadline"]["time"].config(text=f"Zeitfortschritt: {cp_target:.0f}%")
+                self._tile_labels["deadline"]["cp"].config(text=f"CP-Fortschritt: {cp_val:.0f}%")
+
+                self._tile_bars["deadline_time"]["value"] = min(100, max(0, cp_target))
+                self._tile_bars["deadline_cp"]["value"] = min(100, max(0, cp_val))
+
+                self._set_tile_color("deadline", ev.status)
+
+            # 3) Arbeitstempo (CP Pace)
+            elif "pace" in name_lower or "cp/monat" in name_lower:
+                pace_actual = first_crit.value
+                pace_target = first_crit.target
+
+                self._tile_labels["pace"]["actual"].config(text=f"Ist: {pace_actual:.2f} CP/Monat")
+                self._tile_labels["pace"]["target"].config(text=f"Soll: {pace_target:.2f} CP/Monat")
+
+                # Pfeil: ↓ wenn zu langsam, ↑ wenn gut/schnell
+                if ev.status == Status.GREEN:
+                    arrow = "↑"
+                    arrow_color = "green"
+                elif ev.status == Status.YELLOW:
+                    arrow = "→"
+                    arrow_color = "orange"
+                else:
+                    arrow = "↓"
+                    arrow_color = "red"
+
+                self._tile_labels["pace"]["arrow"].config(text=arrow, fg=arrow_color)
+                self._set_tile_color("pace", ev.status)
+
+    def _set_tile_color(self, tile_key: str, status) -> None:
+        """
+        Färbt nur den Content-Frame (nicht die ganze Kachel).
+        """
+        from model import Status
+        
+        if status == Status.GREEN:
+            bg_color = "#c8f7c5"
+        elif status == Status.YELLOW:
+            bg_color = "#fff4cc"
+        else:
+            bg_color = "#ffc9c9"
+
+        # Nur Content-Frame färben
+        content_frame = self._tile_labels[tile_key].get("content_frame")
+        if content_frame:
+            content_frame.configure(bg=bg_color)
+            for child in content_frame.winfo_children():
+                if isinstance(child, tk.Label):
+                    child.configure(bg=bg_color)
+                elif isinstance(child, tk.Frame):
+                    child.configure(bg=bg_color)
+                    for grandchild in child.winfo_children():
+                        if isinstance(grandchild, tk.Label):
+                            grandchild.configure(bg=bg_color)
+
+    def _clear_tiles(self) -> None:
+        """
+        Guard: nur wenn Labels bereits existieren.
+        """
+        if not self._tile_labels.get("grade"):
+            return
+
+        self._tile_labels["grade"]["actual"].config(text="—")
+        self._tile_labels["grade"]["target"].config(text="—")
+        self._tile_labels["grade"]["big"].config(text="—", fg="gray", bg="white")
+
+        self._tile_labels["deadline"]["time"].config(text="Zeitfortschritt: —")
+        self._tile_labels["deadline"]["cp"].config(text="CP-Fortschritt: —")
+        self._tile_bars["deadline_time"]["value"] = 0
+        self._tile_bars["deadline_cp"]["value"] = 0
+
+        self._tile_labels["pace"]["actual"].config(text="Ist: — CP/Monat")
+        self._tile_labels["pace"]["target"].config(text="Soll: — CP/Monat")
+        self._tile_labels["pace"]["arrow"].config(text="—", fg="gray", bg="white")
+
+        # Content-Frames auf weiß zurücksetzen
+        for tile_key in ["grade", "deadline", "pace"]:
+            content_frame = self._tile_labels[tile_key].get("content_frame")
+            if content_frame:
+                content_frame.configure(bg="white")
+                for child in content_frame.winfo_children():
+                    if isinstance(child, tk.Label):
+                        child.configure(bg="white")
+                    elif isinstance(child, tk.Frame):
+                        child.configure(bg="white")
 
 @dataclass
 class DataCollection(ttk.Frame):
     master: tk.Misc
     controller: DashboardController
+    _on_student_saved: Optional[callable] = None  # Callback nach Speichern
 
     def __post_init__(self) -> None:
         super().__init__(self.master)
@@ -168,21 +435,21 @@ class DataCollection(ttk.Frame):
         )
         self.enrollment_tree.heading("module_id", text="Modul-ID")
         self.enrollment_tree.heading("title", text="Titel")
-
-        # Header rechtsbündig (optional, aber meist gewünscht bei Zahlen/Datum)
         self.enrollment_tree.heading("ects", text="ECTS", anchor="e")
         self.enrollment_tree.heading("grade", text="Note", anchor="e")
         self.enrollment_tree.heading("passed", text="Bestanden am", anchor="e")
 
-        # Zellen rechtsbündig
-        self.enrollment_tree.column("ects", anchor="e")
-        self.enrollment_tree.column("grade", anchor="e")
-        self.enrollment_tree.column("passed", anchor="e")
+        # Spalten rechtsbündig + automatische Breite
+        self.enrollment_tree.column("module_id", anchor="w", width=100, stretch=True)
+        self.enrollment_tree.column("title", anchor="w", width=300, stretch=True)
+        self.enrollment_tree.column("ects", anchor="e", width=50, stretch=False)
+        self.enrollment_tree.column("grade", anchor="e", width=50, stretch=False)
+        self.enrollment_tree.column("passed", anchor="e", width=100, stretch=False)
 
         self.enrollment_tree.pack(fill="both", expand=True, padx=8, pady=8)
 
         self._clear_enrollments_view()
-        self.refresh_student_list()
+        self.refresh_student_list()  # ← WIEDER EINBAUEN: notwendig für initiales Füllen des Treeviews
 
     def _clear_enrollments_view(self) -> None:
         for iid in self.enrollment_tree.get_children():
@@ -276,6 +543,10 @@ class DataCollection(ttk.Frame):
         self.controller.process_student_data(self._current_student())
         self.refresh_student_list()
         messagebox.showinfo("Student gespeichert", "Studentendaten wurden erfolgreich übernommen.")
+        
+        # Callback: Synchronisiere Dropdown im anderen Tab
+        if self._on_student_saved:
+            self._on_student_saved()
 
     # NEU: Parser (werden in _save_enrollment genutzt)
     def _parse_grade(self, text: str) -> Optional[float]:
@@ -438,6 +709,17 @@ class DashboardGUI(tk.Frame):
 
         self.data_collection = DataCollection(master=self.tab_entry, controller=self.controller)
         self.data_collection.pack(fill="both", expand=True)
+        
+        # Callback-Verkabelung: Nach Student speichern -> Dropdown aktualisieren
+        self.data_collection._on_student_saved = self.sync_student_dropdown
+
+    def sync_student_dropdown(self) -> None:
+        """
+        Orchestriert die Sync zwischen Tabs:
+        Nach Speichern eines Students im Tab "Datenerfassung"
+        wird das Dropdown im Tab "Zielüberwachung" aktualisiert.
+        """
+        self.target_monitoring.refresh_student_dropdown()
 
     def _refresh_overview_from_form(self) -> None:
         student = self.data_collection._current_student()

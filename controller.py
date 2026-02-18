@@ -45,7 +45,7 @@ class DashboardController:
         self.service.update_student_goals(student_id, target_duration, target_avg, target_cp)
 
     def refresh_dashboard_stats(self, student: Student) -> List[GoalEvaluation]:
-        self.service.update_student_data(student)
+        # self.service.update_student_data(student)  # ← ENTFERNEN: nicht nötig beim Laden aus Dropdown
         return self.service.evaluate_student_goals(student)
 
     def shutdown(self) -> None:
