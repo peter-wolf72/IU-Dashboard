@@ -32,7 +32,6 @@ def main():
 
     # Setup controller (UML: injects Service only)
     controller = DashboardController(service=service)
-    # controller.load_initial_data()  # optional: nur für Demo/Seeding; sonst Module über DB-Skript oder UI pflegen
 
     # Setup and run GUI
     main_window = tk.Tk()
