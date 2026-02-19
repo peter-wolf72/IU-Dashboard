@@ -12,11 +12,11 @@ from model import Student, GoalEvaluation, Module
 
 
 @dataclass
+# --- Dashboard Tab with 3 Tiles for Goal Overview ---
 class TargetMonitoring(ttk.Frame):
     master: tk.Misc
     controller: DashboardController
 
-    # --- Dashboard with 3 Tiles: Grade Average | Deadline / Plan | CP Pace ---
     def __post_init__(self) -> None:
         super().__init__(self.master)
         self._tiles: dict[str, ttk.LabelFrame] = {} # mapping tile_key -> LabelFrame
@@ -25,6 +25,7 @@ class TargetMonitoring(ttk.Frame):
         self._student_rows: dict[str, str] = {}  # mapping display-string -> student_id
         self.render()
 
+    # Renders the dashboard with a student dropdown and 3 overview tiles for grade average, deadline/plan, and work pace.
     def render(self) -> None:
         # --- Header with Student-Dropdown ---
         header = ttk.Frame(self)
@@ -140,12 +141,9 @@ class TargetMonitoring(ttk.Frame):
         # Fill dropdown (after tiles initialized)
         self.refresh_student_dropdown()
 
+    # Helper to refresh the student dropdown with current students from the database;
+    # called after saving a student or when opening the tab.
     def refresh_student_dropdown(self) -> None:
-        """
-        Loads the current student list and populates the dropdown.
-
-        Called after creating a student or when opening the tab.
-        """
         students = self.controller.refresh_student_list()
         self._student_rows.clear()
 
@@ -166,11 +164,8 @@ class TargetMonitoring(ttk.Frame):
             self.student_dropdown.set("")
             self._clear_tiles()
 
+    # Event handler for student selection; loads aggregate and updates overview tiles.
     def on_student_selected(self, _evt=None) -> None:
-        """
-        Event handler: When a student is selected in the dropdown,
-        load their aggregate and display the goals.
-        """
         display = self.student_dropdown.get().strip()
         if not display or display not in self._student_rows:
             self._clear_tiles()
@@ -189,11 +184,9 @@ class TargetMonitoring(ttk.Frame):
             logging.error(f"Error loading student: {e}")
             self._clear_tiles()
 
+    # Update the 3 tiles based on the GoalEvaluation objects.
+    # View only knows presentation (color, values); logic resides in Goal.evaluate().
     def update_overview(self, data: List[GoalEvaluation]) -> None:
-        """
-        Updates the 3 tiles based on the GoalEvaluation objects.
-        View only knows presentation (color, values); logic resides in Goal.evaluate().
-        """
         if not data:
             self._clear_tiles()
             return
@@ -201,49 +194,49 @@ class TargetMonitoring(ttk.Frame):
         # Mapping: Identify Goal based on criteria names (alternatively: Goal title matching)
         from model import Status
 
-        for ev in data:
-            if not ev.criteria:
+        for evaluation in data:
+            if not evaluation.criteria:
                 continue
 
-            first_crit = ev.criteria[0]
-            name_lower = first_crit.name.lower()
+            first_criteria = evaluation.criteria[0]
+            name_lower = first_criteria.name.lower()
 
             # 1) Grade average
             if "notenschnitt" in name_lower:
-                actual = first_crit.value
-                target = first_crit.target
+                actual = first_criteria.value
+                target = first_criteria.target
                 self._tile_labels["grade"]["actual"].config(text=f"{actual:.2f}")
                 self._tile_labels["grade"]["target"].config(text=f"≤ {target:.2f}")
                 self._tile_labels["grade"]["big"].config(text=f"{actual:.1f}")
-                self._set_tile_color("grade", ev.status)
+                self._set_tile_color("grade", evaluation.status)
 
             # 2) Deadline / Plan
             elif "deadline" in name_lower or "cp%" in name_lower:
-                # ev has 2 criteria: CP%, Delta
-                cp_val = ev.criteria[0].value
-                cp_target = ev.criteria[0].target
+                # evaluation has 2 criteria: CP%, Delta
+                cp_value = evaluation.criteria[0].value
+                cp_target = evaluation.criteria[0].target
 
                 self._tile_labels["deadline"]["time"].config(text=f"Zeitfortschritt: {cp_target:.0f}%")
-                self._tile_labels["deadline"]["cp"].config(text=f"CP-Fortschritt: {cp_val:.0f}%")
+                self._tile_labels["deadline"]["cp"].config(text=f"CP-Fortschritt: {cp_value:.0f}%")
 
                 self._tile_bars["deadline_time"]["value"] = min(100, max(0, cp_target))
-                self._tile_bars["deadline_cp"]["value"] = min(100, max(0, cp_val))
+                self._tile_bars["deadline_cp"]["value"] = min(100, max(0, cp_value))
 
-                self._set_tile_color("deadline", ev.status)
+                self._set_tile_color("deadline", evaluation.status)
 
             # 3) Work pace (CP Pace)
             elif "pace" in name_lower or "cp/monat" in name_lower:
-                pace_actual = first_crit.value
-                pace_target = first_crit.target
+                pace_actual = first_criteria.value
+                pace_target = first_criteria.target
 
                 self._tile_labels["pace"]["actual"].config(text=f"Ist: {pace_actual:.2f} CP/Monat")
                 self._tile_labels["pace"]["target"].config(text=f"Soll: {pace_target:.2f} CP/Monat")
 
                 # Arrow: ↓ if too slow, ↑ if good/fast
-                if ev.status == Status.GREEN:
+                if evaluation.status == Status.GREEN:
                     arrow = "↑"
                     arrow_color = "green"
-                elif ev.status == Status.YELLOW:
+                elif evaluation.status == Status.YELLOW:
                     arrow = "→"
                     arrow_color = "orange"
                 else:
@@ -251,8 +244,9 @@ class TargetMonitoring(ttk.Frame):
                     arrow_color = "red"
 
                 self._tile_labels["pace"]["arrow"].config(text=arrow, fg=arrow_color)
-                self._set_tile_color("pace", ev.status)
+                self._set_tile_color("pace", evaluation.status)
 
+    # Helper to set tile color based on status; colors only the content frame
     def _set_tile_color(self, tile_key: str, status) -> None:
         """
         Colors only the content frame (not the entire tile).
@@ -279,11 +273,8 @@ class TargetMonitoring(ttk.Frame):
                         if isinstance(grandchild, tk.Label):
                             grandchild.configure(bg=bg_color)
 
+    # Helper to reset/clear tile content (e.g. when no student selected or error occurs)
     def _clear_tiles(self) -> None:
-        """
-        Clears the content of all tiles and resets their colors, if no student is selected or an error occurs.
-        """
-
         if not self._tile_labels.get("grade"):
             return
 
@@ -325,6 +316,7 @@ class DataCollection(ttk.Frame):
         self._goal_settings: dict[str, float | int] = {} # mapping goal_name -> goal_value
         self.render()
 
+    # Renders the form with fields for student data, goal settings, module management, and enrollment input.
     def render(self) -> None:
         self.student_id_var = tk.StringVar()
         self.name_var = tk.StringVar()
@@ -413,7 +405,7 @@ class DataCollection(ttk.Frame):
 
         self.refresh_module_dropdown()
 
-        # --- List Students (Persistence visible + selection loads form) ---
+        # --- List students (Persistence visible + selection loads form) ---
         lst = ttk.LabelFrame(self, text="Angelegte Studenten")
         lst.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
@@ -455,11 +447,13 @@ class DataCollection(ttk.Frame):
         self._clear_enrollments_view()
         self.refresh_student_list()
 
+    # Helper to clear the enrollments view
     def _clear_enrollments_view(self) -> None:
         for item_id in self.enrollment_tree.get_children():
             self.enrollment_tree.delete(item_id)
         self.enrollment_tree.insert("", "end", values=("—", "Kein Student ausgewählt", "", "", ""))
 
+    # Helper to render enrollments of the selected student in the detail view
     def _render_enrollments(self, student: Student) -> None:
         for item_id in self.enrollment_tree.get_children():
             self.enrollment_tree.delete(item_id)
@@ -478,6 +472,7 @@ class DataCollection(ttk.Frame):
                 values=(module.module_id, module.title, str(module.ects), grade, passed),
             )
 
+    # Helper to get current student data from form fields
     def refresh_student_list(self) -> None:
         for item_id in self.student_tree.get_children():
             self.student_tree.delete(item_id)
@@ -485,11 +480,15 @@ class DataCollection(ttk.Frame):
 
         students = self.controller.refresh_student_list()
         for student in students:
-            item_id = self.student_tree.insert("", "end", values=(student.student_id, student.name, student.start_date.isoformat()))
+            item_id = self.student_tree.insert(
+                "", 
+                "end", 
+                values=(student.student_id, student.name, student.start_date.isoformat()))
             self._student_rows[item_id] = student
 
         self._clear_enrollments_view()
 
+    # Event handler: When a student is selected in the treeview, load their aggregate and display enrollments and goals.
     def on_student_selected(self, _evt=None) -> None:
         selection = self.student_tree.selection()
         if not selection:
@@ -502,7 +501,7 @@ class DataCollection(ttk.Frame):
             self._clear_goal_fields()
             return
 
-        # Query: loads complete aggregate (inkl. Enrollments and Goals)
+        # Query: loads complete aggregate (incl. Enrollments and Goals)
         aggregate = self.controller.get_student_aggregate(student.student_id)
 
         self.student_id_var.set(aggregate.student_id)
@@ -512,14 +511,8 @@ class DataCollection(ttk.Frame):
         self._render_enrollments(aggregate)
         self._display_goals_from_student(aggregate)
 
+    # Displays the goals of the student in the form fields.
     def _display_goals_from_student(self, student: Student) -> None:
-        """
-        Displays the goals of the student in the form fields.
-        
-        :param self: the instance of the class.
-        :param student: the student whose goals are to be displayed.
-        :type student: Student
-        """
         # default values
         duration = ""
         target_avg = ""
@@ -644,10 +637,10 @@ class DataCollection(ttk.Frame):
 
     # Helper to construct a Student object from the form fields; used when saving student data or enrollments
     def _current_student(self) -> Student:
-        sid = self.student_id_var.get().strip()
+        student_id = self.student_id_var.get().strip()
         name = self.name_var.get().strip()
         start_date = datetime.date.fromisoformat(self.start_var.get().strip())
-        return Student(student_id=sid, name=name, start_date=start_date)
+        return Student(student_id=student_id, name=name, start_date=start_date)
 
     # Save module data; called by "Modul speichern" button
     def _save_module(self) -> None:
@@ -724,14 +717,13 @@ class DashboardGUI(tk.Frame):
         # Callback wiring: After saving a student -> update dropdown in overview tab
         self.data_collection._on_student_saved = self.sync_student_dropdown
 
+
+    # orchestrates synchronization between tabs: After saving a student in the "Data Collection" tab, 
+    # the dropdown in the "Target Monitoring" tab is updated.
     def sync_student_dropdown(self) -> None:
-        """
-        Orchestrates the synchronization between tabs:
-        After saving a student in the "Data Collection" tab,
-        the dropdown in the "Target Monitoring" tab is updated.
-        """
         self.target_monitoring.refresh_student_dropdown()
 
+    # Helper to refresh the overview tab based on the currently selected student in the data collection form.
     def _refresh_overview_from_form(self) -> None:
         student = self.data_collection._current_student()
         data = self.controller.refresh_dashboard_stats(student)

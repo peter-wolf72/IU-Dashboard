@@ -7,19 +7,17 @@ from services import DashboardService
 from model import Student, Module, GoalEvaluation
 
 @dataclass
+# Controller for the Dashboard application, responsible for handling user interactions 
+# and orchestrating between the view and service layers.
 class DashboardController:
-    service: DashboardService
+    dashboard_service: DashboardService
 
-    def load_initial_data(self) -> None:
-        # Seed-Beispiele (kann später durch DB-Skript ersetzt werden)
-        self.service.add_module_to_catalogue(Module(module_id="M101", title="Beispielmodul 1", ects=5))
-        self.service.add_module_to_catalogue(Module(module_id="M102", title="Beispielmodul 2", ects=5))
-
+    # Methods to process data from the view and delegate to the service layer
     def process_student_data(self, student: Student) -> None:
-        self.service.update_student_data(student)
+        self.dashboard_service.update_student_data(student)
 
     def process_module_data(self, module: Module) -> None:
-        self.service.add_module_to_catalogue(module)
+        self.dashboard_service.add_module_to_catalogue(module)
 
     def process_enrollment_data(
         self,
@@ -28,13 +26,9 @@ class DashboardController:
         grade: Optional[float] = None,
         date: Optional[datetime.date] = None,
     ) -> None:
-        self.service.update_study_progress(student.student_id, module.module_id, grade, date)
+        self.dashboard_service.update_study_progress(student.student_id, module.module_id, grade, date)
 
     def process_goal_data(self, student_id: str, target_duration: int, target_avg: float, target_cp: float) -> None:
-        """
-        Validiert Goal-Daten und delegiert an Service.
-        """
-        # Grobe Validierung
         if target_duration <= 0:
             raise ValueError("Dauer in Monaten muss > 0 sein.")
         if target_avg <= 0:
@@ -42,20 +36,24 @@ class DashboardController:
         if target_cp < 0:
             raise ValueError("Arbeitstempo darf nicht negativ sein.")
 
-        self.service.update_student_goals(student_id, target_duration, target_avg, target_cp)
+        self.dashboard_service.update_student_goals(student_id, target_duration, target_avg, target_cp)
 
+    # Methods to retrieve data for the view
     def refresh_dashboard_stats(self, student: Student) -> List[GoalEvaluation]:
-        # self.service.update_student_data(student)  # ← ENTFERNEN: nicht nötig beim Laden aus Dropdown
-        return self.service.evaluate_student_goals(student)
+        return self.dashboard_service.evaluate_student_goals(student)
 
+    # Method to gracefully shutdown the application, e.g. close database connections if needed.
     def shutdown(self) -> None:
-        self.service.close()
+        self.dashboard_service.close()
 
+    # Additional helper methods to retrieve lists of students for dropdowns or other UI elements.
     def refresh_student_list(self) -> List[Student]:
-        return self.service.list_students()
+        return self.dashboard_service.list_students()
 
+    # Additional helper method to retrieve the student aggregate for a given student ID, including enrollments and goals.
     def get_student_aggregate(self, student_id: str) -> Student:
-        return self.service.get_student_aggregate(student_id)
+        return self.dashboard_service.get_student_aggregate(student_id)
 
+    # Additional helper method to retrieve the list of modules for module management.
     def refresh_module_list(self) -> List[Module]:
-        return self.service.list_modules()
+        return self.dashboard_service.list_modules()

@@ -24,14 +24,14 @@ def main():
     module_repository = ModuleRepository(database=database)
     enrollment_repository = EnrollmentRepository(database=database)
 
-    service = DashboardService(
+    dashboard_service = DashboardService(
         student_repository=student_repository,
         module_repository=module_repository,
         enrollment_repository=enrollment_repository,
     )
 
     # Setup controller (UML: injects Service only)
-    controller = DashboardController(service=service)
+    controller = DashboardController(dashboard_service=dashboard_service)
 
     # Setup and run GUI
     main_window = tk.Tk()

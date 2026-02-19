@@ -8,14 +8,19 @@ from database import Database
 from model import Student, Module, Enrollment, Goal, GradeAverageGoal, DeadlineGoal, CpPaceGoal
 
 @dataclass
+# Repository for managing Student entities in the database. 
+# Provides methods to upsert students, retrieve aggregates, save goals, and list students.
 class StudentRepository:
     database: Database
 
+    # Update or insert a student record in the database. This method is 
+    # used for both creating new students and updating existing ones.
     def upsert(self, student: Student) -> None:
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
 
         cursor = self.database.conn.cursor()
+        # ON CONFLICT clause ensures that if a student with the same student_id already exists, it will be updated instead of inserted.
         cursor.execute(
             """
             INSERT INTO student (student_id, name, start_date)
@@ -29,10 +34,8 @@ class StudentRepository:
         self.database.conn.commit()
         logging.info(f"Student {student.student_id} upserted successfully.")
 
+    # Retrieve a student aggregate by ID, including enrollments and goals. Returns None if not found.
     def get_aggregate_by_id(self, student_id: str) -> Student | None:
-        """
-        UML: liefert das Student-Aggregat inkl. Enrollment[*] und Goals[*] (read model).
-        """
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
 
@@ -48,7 +51,7 @@ class StudentRepository:
         sid, name, start_date_str = row
         start_date = datetime.date.fromisoformat(start_date_str)
 
-        # Enrollments laden (wie bisher)
+        # Load enrollments for this student with a JOIN to get module details
         cursor.execute(
             """
             SELECT
@@ -62,16 +65,16 @@ class StudentRepository:
         )
         enrollments: List[Enrollment] = []
         for module_id, title, ects, grade, date_passed in cursor.fetchall():
-            mod = Module(module_id=str(module_id), title=str(title), ects=int(ects))
+            module = Module(module_id=str(module_id), title=str(title), ects=int(ects))
             enrollments.append(
                 Enrollment(
-                    module=mod,
+                    module=module,
                     grade=float(grade) if grade is not None else None,
                     date_passed=datetime.date.fromisoformat(date_passed) if date_passed else None,
                 )
             )
 
-        # Goals laden aus student_goals Tabelle
+        # Load goals from student_goals table
         cursor.execute(
             "SELECT goal_type, value FROM student_goals WHERE student_id=?",
             (student_id,),
@@ -88,20 +91,17 @@ class StudentRepository:
         logging.info("Student aggregate loaded: %s (enrollments=%d, goals=%d)", sid, len(enrollments), len(goals))
         return Student(student_id=sid, name=name, start_date=start_date, enrollments=enrollments, goals=goals)
 
+    # Save Goal objects for a student in the student_goals table. Deletes old goals and inserts new ones.
     def save_goals(self, student_id: str, goals: List[Goal]) -> None:
-        """
-        Speichert Goal-Objekte für einen Student in der student_goals Tabelle.
-        Löscht alte Goals und fügt neue ein.
-        """
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
 
         cursor = self.database.conn.cursor()
 
-        # Alte Goals für diesen Student löschen
+        # Delete old goals for this student
         cursor.execute("DELETE FROM student_goals WHERE student_id=?", (student_id,))
 
-        # Neue Goals speichern
+        # Save new goals
         for goal in goals:
             goal_type = goal.__class__.__name__
             if isinstance(goal, GradeAverageGoal):
@@ -121,6 +121,7 @@ class StudentRepository:
         self.database.conn.commit()
         logging.info(f"Goals for student {student_id} saved: {len(goals)} goals.")
 
+    # List all students in the database, without enrollments or goals. Used for dropdowns or lists.
     def list_all(self) -> List[Student]:
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
@@ -130,23 +131,28 @@ class StudentRepository:
             "SELECT student_id, name, start_date FROM student ORDER BY name COLLATE NOCASE, student_id"
         )
         out: List[Student] = []
-        for sid, name, start_date_str in cursor.fetchall():
-            out.append(Student(str(sid), str(name), datetime.date.fromisoformat(start_date_str)))
+        for student_id, name, start_date_str in cursor.fetchall():
+            out.append(Student(str(student_id), str(name), datetime.date.fromisoformat(start_date_str)))
         logging.info("Students listed: %d", len(out))
         return out
 
+    # Close the database connection when the repository is no longer needed. This is important for resource management.
     def close(self) -> None:
         self.database.close()
 
 
 @dataclass
+# Repository for managing Module entities in the database. 
+# Provides methods to upsert modules and list them.
 class ModuleRepository:
     database: Database
 
+    # Upsert a module record in the database. This method is used for both creating new modules and updating existing ones.
     def upsert(self, module: Module) -> None:
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
         cursor = self.database.conn.cursor()
+        # ON CONFLICT clause ensures that if a module with the same module_id already exists, it will be updated instead of inserted.
         cursor.execute(
             """
             INSERT INTO module (module_id, title, ects)
@@ -160,10 +166,7 @@ class ModuleRepository:
         self.database.conn.commit()
         logging.info(f"Module {module.module_id} upserted successfully.")
         
-    # Kompatibilität: falls noch Alt-Code .add() aufruft
-    def add(self, module: Module) -> None:
-        self.upsert(module)
-
+    # Retrieve a module by ID. Returns None if not found.
     def get_by_id(self, module_id: str) -> Module | None:
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
@@ -176,6 +179,7 @@ class ModuleRepository:
         logging.info(f"Module {mid} retrieved successfully.")
         return Module(mid, title, int(ects))
 
+    # List all modules in the database, ordered by title. Used for dropdowns or lists.
     def list_all(self) -> List[Module]:
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
@@ -189,14 +193,19 @@ class ModuleRepository:
         logging.info("Modules listed: %d", len(out))
         return out
 
+    # Close the database connection when the repository is no longer needed. This is important for resource management.
     def close(self) -> None:
         self.database.close()
 
 
 @dataclass
+# Repository for managing Enrollment entities in the database. 
+# Provides methods to upsert enrollments and list them by student.
 class EnrollmentRepository:
     database: Database
 
+    # Upsert an enrollment record in the database. This method is used for both 
+    # creating new enrollments and updating existing ones.
     def upsert(
         self,
         student_id: str,
@@ -207,6 +216,7 @@ class EnrollmentRepository:
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
         cursor = self.database.conn.cursor()
+        # ON CONFLICT clause ensures that if an enrollment with the same student_id and module_id already exists, it will be updated instead of inserted.
         cursor.execute(
             """
             INSERT INTO enrollment (student_id, module_id, grade, date_passed)
@@ -223,11 +233,14 @@ class EnrollmentRepository:
             ),
         )
         self.database.conn.commit()
-        logging.info(f"Enrollment for student {student_id} in module {module_id} upserted successfully.")   
+        logging.info(f"Enrollment for student {student_id} in module {module_id} upserted successfully.")
+
+    # List all enrollments for a specific student. Returns an empty list if none are found.
     def list_by_student(self, student_id: str) -> List[Enrollment]:
         if self.database.conn is None:
             raise RuntimeError("Database not connected")
         cursor = self.database.conn.cursor()
+        # load enrollments for this student with a JOIN to get module details
         cursor.execute(
             """
             SELECT
@@ -252,5 +265,6 @@ class EnrollmentRepository:
         logging.info(f"Enrollments for student {student_id} retrieved successfully.")
         return out
 
+    # Close the database connection when the repository is no longer needed. This is important for resource management.
     def close(self) -> None:
         self.database.close()
