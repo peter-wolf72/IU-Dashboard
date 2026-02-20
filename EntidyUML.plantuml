@@ -47,7 +47,6 @@ package "Model" {
     }
 
     class StudyProgram {
-      -program_id: str
       -name: str
       -total_ects: int
       -duration_months: int

@@ -23,7 +23,6 @@ class Module:
 # Study program data model
 @dataclass(frozen=True)
 class StudyProgram:
-    program_id: str
     name: str
     total_ects: int
     duration_months: int

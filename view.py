@@ -55,39 +55,39 @@ class TargetMonitoring(ttk.Frame):
         self._tiles["grade"] = tile_grade
 
         # Captions without color, centered at the top of the tile
-        lbl_grade_actual_caption = tk.Label(tile_grade, text="Aktuell:", font=("", 10))
-        lbl_grade_actual_caption.pack(anchor="center")
-        lbl_grade_actual = tk.Label(tile_grade, text="—", font=("", 10))
-        lbl_grade_actual.pack(anchor="center")
+        label_grade_actual_caption = tk.Label(tile_grade, text="Aktuell:", font=("", 10))
+        label_grade_actual_caption.pack(anchor="center")
+        label_grade_actual = tk.Label(tile_grade, text="—", font=("", 10))
+        label_grade_actual.pack(anchor="center")
 
-        lbl_grade_target_caption = tk.Label(tile_grade, text="Ziel:", font=("", 10))
-        lbl_grade_target_caption.pack(anchor="center", pady=(8, 0))
-        lbl_grade_target = tk.Label(tile_grade, text="—", font=("", 10))
-        lbl_grade_target.pack(anchor="center")
+        label_grade_target_caption = tk.Label(tile_grade, text="Ziel:", font=("", 10))
+        label_grade_target_caption.pack(anchor="center", pady=(8, 0))
+        label_grade_target = tk.Label(tile_grade, text="—", font=("", 10))
+        label_grade_target.pack(anchor="center")
 
         # Inner Frame for colored content
         grade_content = tk.Frame(tile_grade, bg="white")
         grade_content.pack(pady=16, fill="both", expand=True)
 
-        lbl_grade_big = tk.Label(grade_content, text="—", font=("", 48, "bold"), fg="red", bg="white")
-        lbl_grade_big.pack(pady=16, anchor="center")
+        label_grade_big = tk.Label(grade_content, text="—", font=("", 48, "bold"), fg="red", bg="white")
+        label_grade_big.pack(pady=16, anchor="center")
 
         self._tile_labels["grade"] = {
-            "actual": lbl_grade_actual,
-            "target": lbl_grade_target,
-            "big": lbl_grade_big,
+            "actual": label_grade_actual,
+            "target": label_grade_target,
+            "big": label_grade_big,
             "content_frame": grade_content,
         }
 
-        # Tile 2: Bachelor / Deadline
+        # Tile 2: Bachelor deadline
         tile_deadline = ttk.LabelFrame(container, text="Bachelorabschluss", padding=16)
         tile_deadline.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
         self._tiles["deadline"] = tile_deadline
 
-        lbl_deadline_time = tk.Label(tile_deadline, text="Zeitfortschritt: —", font=("", 10), anchor="center")
-        lbl_deadline_time.pack(anchor="center")
-        lbl_deadline_cp = tk.Label(tile_deadline, text="CP-Fortschritt: —", font=("", 10), anchor="center")
-        lbl_deadline_cp.pack(anchor="center", pady=(4, 0))
+        label_deadline_time = tk.Label(tile_deadline, text="Zeitfortschritt: —", font=("", 10), anchor="center")
+        label_deadline_time.pack(anchor="center")
+        label_deadline_cp = tk.Label(tile_deadline, text="CP-Fortschritt: —", font=("", 10), anchor="center")
+        label_deadline_cp.pack(anchor="center", pady=(4, 0))
 
         # Inner Frame for Bars (colored)
         deadline_content = tk.Frame(tile_deadline, bg="white")
@@ -96,19 +96,34 @@ class TargetMonitoring(ttk.Frame):
         bar_frame = tk.Frame(deadline_content)
         bar_frame.pack(expand=True)  # expand=True for vertical centering
 
-        lbl_bar_left = tk.Label(bar_frame, text="Zeit", font=("", 9), bg="white")
-        lbl_bar_left.grid(row=0, column=0, padx=4)
-        bar_time = ttk.Progressbar(bar_frame, orient="vertical", length=80, mode="determinate")
+        style = ttk.Style()
+        style.theme_use("alt")
+        style.configure(
+            "ProgressTime.Vertical.TProgressbar",
+            # troughcolor="grey",      # Hintergrund
+            # background="#EF0C0C",     # Fortschrittsfarbe
+            thickness=20              # 
+        )
+        style.configure(
+            "ProgressCP.Vertical.TProgressbar",
+            # troughcolor="grey",      # Hintergrund
+            # background="#EF0C0C",     # Fortschrittsfarbe
+            thickness=20              # 
+        )
+
+        label_bar_left = tk.Label(bar_frame, text="Zeit", font=("", 9), fg="black", bg="white")
+        label_bar_left.grid(row=0, column=0, padx=4)
+        bar_time = ttk.Progressbar(bar_frame, orient="vertical", length=100, mode="determinate", style="ProgressTime.Vertical.TProgressbar")
         bar_time.grid(row=1, column=0, padx=4)
 
-        lbl_bar_right = tk.Label(bar_frame, text="CP", font=("", 9), bg="white")
-        lbl_bar_right.grid(row=0, column=1, padx=4)
-        bar_cp = ttk.Progressbar(bar_frame, orient="vertical", length=80, mode="determinate")
+        label_bar_right = tk.Label(bar_frame, text="CP", font=("", 9), fg="black", bg="white")
+        label_bar_right.grid(row=0, column=1, padx=4)
+        bar_cp = ttk.Progressbar(bar_frame, orient="vertical", length=100, mode="determinate", style="ProgressCP.Vertical.TProgressbar")
         bar_cp.grid(row=1, column=1, padx=4)
 
         self._tile_labels["deadline"] = {
-            "time": lbl_deadline_time,
-            "cp": lbl_deadline_cp,
+            "time": label_deadline_time,
+            "cp": label_deadline_cp,
             "content_frame": deadline_content,
         }
         self._tile_bars["deadline_time"] = bar_time
@@ -119,22 +134,22 @@ class TargetMonitoring(ttk.Frame):
         tile_pace.grid(row=0, column=2, sticky="nsew", padx=8, pady=8)
         self._tiles["pace"] = tile_pace
 
-        lbl_pace_actual = tk.Label(tile_pace, text="Ist: — CP/Monat", font=("", 10), anchor="center")
-        lbl_pace_actual.pack(anchor="center")
-        lbl_pace_target = tk.Label(tile_pace, text="Soll: — CP/Monat", font=("", 10), anchor="center")
-        lbl_pace_target.pack(anchor="center", pady=(4, 0))
+        label_pace_actual = tk.Label(tile_pace, text="Ist: — CP/Monat", font=("", 10), anchor="center")
+        label_pace_actual.pack(anchor="center")
+        label_pace_target = tk.Label(tile_pace, text="Soll: — CP/Monat", font=("", 10), anchor="center")
+        label_pace_target.pack(anchor="center", pady=(4, 0))
 
         # Inner Frame for arrow (colored)
         pace_content = tk.Frame(tile_pace, bg="white")
         pace_content.pack(pady=16, fill="both", expand=True)
 
-        lbl_pace_arrow = tk.Label(pace_content, text="—", font=("", 48), fg="black", bg="white")
-        lbl_pace_arrow.pack(expand=True)  # expand=True for vertical AND horizontal centering
+        label_pace_arrow = tk.Label(pace_content, text="—", font=("", 48), fg="black", bg="white")
+        label_pace_arrow.pack(expand=True)  # expand=True for vertical AND horizontal centering
 
         self._tile_labels["pace"] = {
-            "actual": lbl_pace_actual,
-            "target": lbl_pace_target,
-            "arrow": lbl_pace_arrow,
+            "actual": label_pace_actual,
+            "target": label_pace_target,
+            "arrow": label_pace_arrow,
             "content_frame": pace_content,
         }
 
@@ -149,10 +164,10 @@ class TargetMonitoring(ttk.Frame):
 
         # Display strings: "Student-ID – Name"
         values = []
-        for s in students:
-            display = f"{s.student_id} – {s.name}"
+        for student in students:
+            display = f"{student.student_id} – {student.name}"
             values.append(display)
-            self._student_rows[display] = s.student_id
+            self._student_rows[display] = student.student_id
 
         self.student_dropdown["values"] = values
 
@@ -445,6 +460,7 @@ class DataCollection(ttk.Frame):
         self.enrollment_tree.pack(fill="both", expand=True, padx=8, pady=8)
 
         self._clear_enrollments_view()
+        
         self.refresh_student_list()
 
     # Helper to clear the enrollments view
@@ -722,6 +738,7 @@ class DashboardGUI(tk.Frame):
     # the dropdown in the "Target Monitoring" tab is updated.
     def sync_student_dropdown(self) -> None:
         self.target_monitoring.refresh_student_dropdown()
+        logging.info("Student dropdown in Target Monitoring refreshed after saving student data in Data Collection tab.")
 
     # Helper to refresh the overview tab based on the currently selected student in the data collection form.
     def _refresh_overview_from_form(self) -> None:

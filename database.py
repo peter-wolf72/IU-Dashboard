@@ -5,6 +5,7 @@ from typing import Optional
 from dataclasses import dataclass
 
 @dataclass
+# Database class responsible for managing the SQLite connection and initializing the database schema.
 class Database:
     db_path: str = "dashboard.db"
     conn: Optional[sqlite3.Connection] = None
@@ -21,7 +22,6 @@ class Database:
             logging.info("Database connected successfully.")
 
     def init_db(self) -> None:
-        """Create tables if they don't exist."""
         if self.conn is None:
             raise RuntimeError("Database not connected.")
 
@@ -31,8 +31,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS student (
                 student_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                start_date TEXT NOT NULL,
-                program_id TEXT
+                start_date TEXT NOT NULL
             )
         """)
 
