@@ -26,14 +26,14 @@ package "Model" {
       -enrollments: Enrollment[*]
       -goals: Goal[*]
 
+      -_months_since_start(now: date): int
       +get_average_grade(): float
       +get_time_progress_percentage(duration_months: int): float
       +get_cp_progress_percentage(total_ects: int): float
       +get_earned_ects(): int
       +get_cp_per_month(): float
-
-      ' Central Dashboard Logic (Rich Domain Entry Point)
-      **+evaluate_all_goals(program: StudyProgram): GoalEvaluation[*]**    }
+      +evaluate_all_goals(program: StudyProgram): GoalEvaluation[*]
+    }
 
     class Enrollment {
       -grade: float
@@ -79,46 +79,52 @@ package "Model" {
 
 
   abstract class Goal {
-    +evaluate(student: Student, program: StudyProgram): GoalEvaluation
+    {abstract} +evaluate(student: Student, program: StudyProgram): GoalEvaluation
     {abstract} +get_title(): str
   }
 
   Student "1" -- "1..*" Goal : has
   Goal ..> GoalEvaluation
-  Goal ..> Status
+  GoalEvaluation "1" --> "1" Status : has
 
   class GradeAverageGoal {
     -target_avg: float
-    +get_title(): str
+    ' +evaluate(student: Student, program: StudyProgram): GoalEvaluation
+    ' +get_title(): str
   }
   Goal <|-- GradeAverageGoal
 
   class DeadlineGoal {
     -duration_months: int
-    +get_title(): str
+    ' +evaluate(student: Student, program: StudyProgram): GoalEvaluation
+    ' +get_title(): str
   }
   Goal <|-- DeadlineGoal
 
   class CpPaceGoal {
     -target_cp_per_month: float
-    +get_title(): str
+    ' +evaluate(student: Student, program: StudyProgram): GoalEvaluation
+    ' +get_title(): str
   }
   Goal <|-- CpPaceGoal
 
   ' --- Business Logic ---
   class DashboardService {
-    -student_repo: StudentRepository
-    -module_repo: ModuleRepository
-    -enrollment_repo: EnrollmentRepository
+    -student_repository: StudentRepository
+    -module_repository: ModuleRepository
+    -enrollment_repository: EnrollmentRepository
+    -_program: StudyProgram
 
+    +create_default_program(): StudyProgram
     +update_student_data(student: Student): None
+    +get_student_aggregate(student_id: str): Student
     +add_module_to_catalogue(module: Module): None
     +update_study_progress(student_id: str, module_id: str, grade: float, date_passed: date): None
     +evaluate_student_goals(student: Student): GoalEvaluation[*]
     +list_students(): Student[*]
-    +get_student_aggregate(student_id: str): Student
     +list_modules(): Module[*]
-    +update_student_goals(student_id: str, goals: Goal[*]): None
+    +update_student_goals(student_id: str, duration_months: int, target_avg: float, target_cp_per_month: float): None
+    +close(): None
   }
   together {
     ' --- Persistence ---
@@ -131,15 +137,15 @@ package "Model" {
     }
 
     class StudentRepository {
-      -db: Database
+      -database: Database
       +upsert(student: Student): None
-      +get_aggregate_by_id(student_id: str): Student # Loads Student, Enrollments and Goals
-      +list_all(): Student[*]
+      +get_aggregate_by_id(student_id: str): Student
       +save_goals(student_id: str, goals: Goal[*]): None
+      +list_all(): Student[*]
       +close(): None
     }
     class ModuleRepository {
-      -db: Database
+      -database: Database
       +upsert(module: Module): None
       +get_by_id(module_id: str): Module
       +list_all(): Module[*]
@@ -147,7 +153,7 @@ package "Model" {
     }
 
     class EnrollmentRepository {
-      -db: Database
+      -database: Database
       +upsert(student_id: str, module_id: str, grade: float, date_passed: date): None
       +list_by_student(student_id: str): Enrollment[*]
       +close(): None
@@ -179,20 +185,17 @@ package "Model" {
 ' =========================
 package "Controller" {
   class DashboardController {
-    -service: DashboardService
+    -dashboard_service: DashboardService
 
-    +load_initial_data(): None
     +process_student_data(student: Student): None
     +process_module_data(module: Module): None
-    +process_enrollment_data(student: Student, module: Module, grade=None, date=None): None
+    +process_enrollment_data(student: Student, module: Module, grade: float, date: date): None
+    +process_goal_data(student_id: str, target_duration: int, target_avg: float, target_cp: float): None
     +refresh_dashboard_stats(student: Student): GoalEvaluation[*]
+    +shutdown(): None
     +refresh_student_list(): Student[*]
     +get_student_aggregate(student_id: str): Student
-    +process_goal_data(student_id: str, target_duration: int, target_avg: float, target_cp: float): None
-    
-    
-
-    +shutdown(): None
+    +refresh_module_list(): Module[*]
   }
   DashboardController --> DashboardService
   DashboardController ..> GoalEvaluation
@@ -210,29 +213,55 @@ package "View" {
     -tab_overview: ttk.Frame
     -tab_entry: ttk.Frame
     -controller: DashboardController
+    -target_monitoring: TargetMonitoring
+    -data_collection: DataCollection
 
     +create_widgets(): None
+    +sync_student_dropdown(): None
+    -_refresh_overview_from_form(): None
     +on_window_close(): None
-    **+sync_student_dropdown(): None  ' Orchestriert Sync zwischen Tabs**
   }
 
   class TargetMonitoring {
+    -master: tk.Misc
     -controller: DashboardController
+    -_tiles: dict
+    -_tile_labels: dict
+    -_tile_bars: dict
+    -_student_rows: dict
     -student_dropdown: ttk.Combobox
-    -student_rows: dict[str, str]  ' Mapping: display-string -> student_id
 
     +render(): None
+    +refresh_student_dropdown(): None
+    +on_student_selected(_evt): None
     +update_overview(data: GoalEvaluation[*]): None
-    **+refresh_student_dropdown(): None  ' Lädt aktuelle Studenten aus Controller**
-    **+on_student_selected(_evt): None  ' Event-Handler für Dropdown-Auswahl**
+    -_set_tile_color(tile_key: str, status: Status): None
+    -_clear_tiles(): None
   }
 
   class DataCollection {
+    -master: tk.Misc
     -controller: DashboardController
-    # ...existing...
+    -_on_student_saved: callable
+    -_student_rows: dict
+    -_modules_by_id: dict
+    -_goal_settings: dict
 
+    +render(): None
+    -_clear_enrollments_view(): None
+    -_render_enrollments(student: Student): None
+    +refresh_student_list(): None
+    +on_student_selected(_evt): None
+    -_display_goals_from_student(student: Student): None
+    -_clear_goal_fields(): None
     +submit_data(): None
-    # Nach Eintrag wird sync aufgerufen
+    -_parse_grade(text: str): float
+    -_parse_date(text: str): date
+    -_save_enrollment(): None
+    +refresh_module_dropdown(): None
+    -_current_student(): Student
+    -_save_module(): None
+    -_save_goal_settings(): None
   }
 
   DashboardGUI o-- TargetMonitoring
@@ -245,7 +274,7 @@ package "View" {
   DataCollection ..> DashboardController
   TargetMonitoring ..> GoalEvaluation
   
-  **DashboardGUI ..> TargetMonitoring : sync_student_dropdown()**
+  DashboardGUI ..> TargetMonitoring : sync_student_dropdown()
 }
 
 ' ==========================
