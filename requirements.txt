@@ -1,0 +1,4 @@
+# This project uses only the Python standard library.
+# No external packages are required for operation.
+# Optional: If you want to run tests:
+# pytest>=8.0.0
