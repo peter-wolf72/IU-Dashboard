@@ -19,13 +19,9 @@ class TargetMonitoring(ttk.Frame):
 
     def __post_init__(self) -> None:
         super().__init__(self.master)
-        self._tiles: dict[str, ttk.LabelFrame] = {} # mapping tile_key -> LabelFrame
-        self._tile_labels: dict[str, dict[str, tk.Label]] = {} # mapping tile_key -> dict of label keys (e.g. "actual", "target", "big") -> Label widget
-        self._tile_bars: dict[str, ttk.Progressbar] = {} # mapping tile_key -> Progressbar widget
         self._student_rows: dict[str, str] = {}  # mapping display-string -> student_id
         self.render()
 
-    # Renders the dashboard with a student dropdown and 3 overview tiles for grade average, deadline/plan, and work pace.
     def render(self) -> None:
         # --- Header with Student-Dropdown ---
         header = ttk.Frame(self)
@@ -42,127 +38,17 @@ class TargetMonitoring(ttk.Frame):
         self.student_dropdown.pack(side="left", fill="x", expand=True)
         self.student_dropdown.bind("<<ComboboxSelected>>", self.on_student_selected)
 
-        # --- Container for 3 Tiles in a Row ---
-        container = ttk.Frame(self)
-        container.pack(fill="both", expand=True, padx=24, pady=24)
-        container.grid_columnconfigure(0, weight=1, uniform="tile")
-        container.grid_columnconfigure(1, weight=1, uniform="tile")
-        container.grid_columnconfigure(2, weight=1, uniform="tile")
+        # --- Container for dynamic Tiles ---
+        self.container = ttk.Frame(self)
+        self.container.pack(fill="both", expand=True, padx=24, pady=24)
 
-        # Tile 1: Grade Average
-        tile_grade = ttk.LabelFrame(container, text="Notendurchschnitt", padding=16)
-        tile_grade.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-        self._tiles["grade"] = tile_grade
-
-        # Captions without color, centered at the top of the tile
-        label_grade_actual_caption = tk.Label(tile_grade, text="Aktuell:", font=("", 10))
-        label_grade_actual_caption.pack(anchor="center")
-        label_grade_actual = tk.Label(tile_grade, text="—", font=("", 10))
-        label_grade_actual.pack(anchor="center")
-
-        label_grade_target_caption = tk.Label(tile_grade, text="Ziel:", font=("", 10))
-        label_grade_target_caption.pack(anchor="center", pady=(8, 0))
-        label_grade_target = tk.Label(tile_grade, text="—", font=("", 10))
-        label_grade_target.pack(anchor="center")
-
-        # Inner Frame for colored content
-        grade_content = tk.Frame(tile_grade, bg="white")
-        grade_content.pack(pady=16, fill="both", expand=True)
-
-        label_grade_big = tk.Label(grade_content, text="—", font=("", 48, "bold"), fg="red", bg="white")
-        label_grade_big.pack(pady=16, anchor="center")
-
-        self._tile_labels["grade"] = {
-            "actual": label_grade_actual,
-            "target": label_grade_target,
-            "big": label_grade_big,
-            "content_frame": grade_content,
-        }
-
-        # Tile 2: Bachelor deadline
-        tile_deadline = ttk.LabelFrame(container, text="Bachelorabschluss", padding=16)
-        tile_deadline.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
-        self._tiles["deadline"] = tile_deadline
-
-        label_deadline_time = tk.Label(tile_deadline, text="Zeitfortschritt: —", font=("", 10), anchor="center")
-        label_deadline_time.pack(anchor="center")
-        label_deadline_cp = tk.Label(tile_deadline, text="CP-Fortschritt: —", font=("", 10), anchor="center")
-        label_deadline_cp.pack(anchor="center", pady=(4, 0))
-
-        # Inner Frame for Bars (colored)
-        deadline_content = tk.Frame(tile_deadline, bg="white")
-        deadline_content.pack(pady=12, fill="both", expand=True)
-
-        bar_frame = tk.Frame(deadline_content)
-        bar_frame.pack(expand=True)  # expand=True for vertical centering
-
-        style = ttk.Style()
-        style.theme_use("alt")
-        style.configure(
-            "ProgressTime.Vertical.TProgressbar",
-            # troughcolor="grey",      # Hintergrund
-            # background="#EF0C0C",     # Fortschrittsfarbe
-            thickness=20              # 
-        )
-        style.configure(
-            "ProgressCP.Vertical.TProgressbar",
-            # troughcolor="grey",      # Hintergrund
-            # background="#EF0C0C",     # Fortschrittsfarbe
-            thickness=20              # 
-        )
-
-        label_bar_left = tk.Label(bar_frame, text="Zeit", font=("", 9), fg="black", bg="white")
-        label_bar_left.grid(row=0, column=0, padx=4)
-        bar_time = ttk.Progressbar(bar_frame, orient="vertical", length=100, mode="determinate", style="ProgressTime.Vertical.TProgressbar")
-        bar_time.grid(row=1, column=0, padx=4)
-
-        label_bar_right = tk.Label(bar_frame, text="CP", font=("", 9), fg="black", bg="white")
-        label_bar_right.grid(row=0, column=1, padx=4)
-        bar_cp = ttk.Progressbar(bar_frame, orient="vertical", length=100, mode="determinate", style="ProgressCP.Vertical.TProgressbar")
-        bar_cp.grid(row=1, column=1, padx=4)
-
-        self._tile_labels["deadline"] = {
-            "time": label_deadline_time,
-            "cp": label_deadline_cp,
-            "content_frame": deadline_content,
-        }
-        self._tile_bars["deadline_time"] = bar_time
-        self._tile_bars["deadline_cp"] = bar_cp
-
-        # Tile 3: CP Pace
-        tile_pace = ttk.LabelFrame(container, text="Arbeitstempo", padding=16)
-        tile_pace.grid(row=0, column=2, sticky="nsew", padx=8, pady=8)
-        self._tiles["pace"] = tile_pace
-
-        label_pace_actual = tk.Label(tile_pace, text="Ist: — CP/Monat", font=("", 10), anchor="center")
-        label_pace_actual.pack(anchor="center")
-        label_pace_target = tk.Label(tile_pace, text="Soll: — CP/Monat", font=("", 10), anchor="center")
-        label_pace_target.pack(anchor="center", pady=(4, 0))
-
-        # Inner Frame for arrow (colored)
-        pace_content = tk.Frame(tile_pace, bg="white")
-        pace_content.pack(pady=16, fill="both", expand=True)
-
-        label_pace_arrow = tk.Label(pace_content, text="—", font=("", 48), fg="black", bg="white")
-        label_pace_arrow.pack(expand=True)  # expand=True for vertical AND horizontal centering
-
-        self._tile_labels["pace"] = {
-            "actual": label_pace_actual,
-            "target": label_pace_target,
-            "arrow": label_pace_arrow,
-            "content_frame": pace_content,
-        }
-
-        # Fill dropdown (after tiles initialized)
+        # Fill dropdown 
         self.refresh_student_dropdown()
 
-    # Helper to refresh the student dropdown with current students from the database;
-    # called after saving a student or when opening the tab.
     def refresh_student_dropdown(self) -> None:
         students = self.controller.refresh_student_list()
         self._student_rows.clear()
 
-        # Display strings: "Student-ID – Name"
         values = []
         for student in students:
             display = f"{student.student_id} – {student.name}"
@@ -171,152 +57,129 @@ class TargetMonitoring(ttk.Frame):
 
         self.student_dropdown["values"] = values
 
-        # Keep currently selected ID (if available); otherwise reset to empty
         current_display = self.student_dropdown.get()
         if current_display and current_display in self._student_rows:
             self.student_dropdown.set(current_display)
         else:
             self.student_dropdown.set("")
-            self._clear_tiles()
+            self._show_placeholder()
 
-    # Event handler for student selection; loads aggregate and updates overview tiles.
     def on_student_selected(self, _evt=None) -> None:
         display = self.student_dropdown.get().strip()
         if not display or display not in self._student_rows:
-            self._clear_tiles()
+            self._show_placeholder()
             return
 
         student_id = self._student_rows[display]
 
         try:
-            # Query: Load aggregate (including goals) via Service
             student = self.controller.get_student_aggregate(student_id)
-            # Evaluate Goals
             data = self.controller.refresh_dashboard_stats(student)
-            # Update Tiles based on GoalEvaluation data
             self.update_overview(data)
         except Exception as e:
             logging.error(f"Error loading student: {e}")
-            self._clear_tiles()
+            self._show_placeholder()
 
-    # Update the 3 tiles based on the GoalEvaluation objects.
-    # View only knows presentation (color, values); logic resides in Goal.evaluate().
     def update_overview(self, data: List[GoalEvaluation]) -> None:
+        self._clear_tiles()
         if not data:
-            self._clear_tiles()
+            self._show_placeholder()
             return
 
-        # Mapping: Identify Goal based on criteria names (alternatively: Goal title matching)
         from model import Status
 
-        for evaluation in data:
-            if not evaluation.criteria:
-                continue
-
-            first_criteria = evaluation.criteria[0]
-            name_lower = first_criteria.name.lower()
-
-            # 1) Grade average
-            if "notenschnitt" in name_lower:
-                actual = first_criteria.value
-                target = first_criteria.target
-                self._tile_labels["grade"]["actual"].config(text=f"{actual:.2f}")
-                self._tile_labels["grade"]["target"].config(text=f"≤ {target:.2f}")
-                self._tile_labels["grade"]["big"].config(text=f"{actual:.1f}")
-                self._set_tile_color("grade", evaluation.status)
-
-            # 2) Deadline / Plan
-            elif "deadline" in name_lower or "cp%" in name_lower:
-                # evaluation has 2 criteria: CP%, Delta
-                cp_value = evaluation.criteria[0].value
-                cp_target = evaluation.criteria[0].target
-
-                self._tile_labels["deadline"]["time"].config(text=f"Zeitfortschritt: {cp_target:.0f}%")
-                self._tile_labels["deadline"]["cp"].config(text=f"CP-Fortschritt: {cp_value:.0f}%")
-
-                self._tile_bars["deadline_time"]["value"] = min(100, max(0, cp_target))
-                self._tile_bars["deadline_cp"]["value"] = min(100, max(0, cp_value))
-
-                self._set_tile_color("deadline", evaluation.status)
-
-            # 3) Work pace (CP Pace)
-            elif "pace" in name_lower or "cp/monat" in name_lower:
-                pace_actual = first_criteria.value
-                pace_target = first_criteria.target
-
-                self._tile_labels["pace"]["actual"].config(text=f"Ist: {pace_actual:.2f} CP/Monat")
-                self._tile_labels["pace"]["target"].config(text=f"Soll: {pace_target:.2f} CP/Monat")
-
-                # Arrow: ↓ if too slow, ↑ if good/fast
-                if evaluation.status == Status.GREEN:
-                    arrow = "↑"
-                    arrow_color = "green"
-                elif evaluation.status == Status.YELLOW:
-                    arrow = "→"
-                    arrow_color = "orange"
-                else:
-                    arrow = "↓"
-                    arrow_color = "red"
-
-                self._tile_labels["pace"]["arrow"].config(text=arrow, fg=arrow_color)
-                self._set_tile_color("pace", evaluation.status)
-
-    # Helper to set tile color based on status; colors only the content frame
-    def _set_tile_color(self, tile_key: str, status) -> None:
-        """
-        Colors only the content frame (not the entire tile).
-        """
-        from model import Status
+        # Sort order for the tiles based on goal title
+        sort_order = {
+            "Notenschnitt": 0,
+            "Bachelorabschluss": 1,
+            "Arbeitstempo": 2
+        }
         
-        if status == Status.GREEN:
-            bg_color = "#c8f7c5"
-        elif status == Status.YELLOW:
-            bg_color = "#fff4cc"
-        else:
-            bg_color = "#ffc9c9"
+        # Sort data according to the predefined order, fallback to 999 for unknown titles
+        sorted_data = sorted(data, key=lambda evaluation: sort_order.get(evaluation.title, 999))
 
-        # Set only the content frame color
-        content_frame = self._tile_labels[tile_key].get("content_frame")
-        if content_frame:
-            content_frame.configure(bg=bg_color)
-            for child in content_frame.winfo_children():
-                if isinstance(child, tk.Label):
-                    child.configure(bg=bg_color)
-                elif isinstance(child, tk.Frame):
-                    child.configure(bg=bg_color)
-                    for grandchild in child.winfo_children():
-                        if isinstance(grandchild, tk.Label):
-                            grandchild.configure(bg=bg_color)
+        # Tile factory: iterates over the provided GoalEvaluations and creates a tile for each, displaying the
+        # relevant data and status with appropriate colors and formats. Each tile's content is dynamically generated
+        # based on its ui_type, allowing for different visual representations (e.g. big text, dual progress bars, arrows).
+        for column, evaluation in enumerate(sorted_data):
+            self.container.grid_columnconfigure(column, weight=1, uniform="tile")
+            
+            tile = ttk.LabelFrame(self.container, text=evaluation.title, padding=16)
+            tile.grid(row=0, column=column, sticky="nsew", padx=8, pady=8)
 
-    # Helper to reset/clear tile content (e.g. when no student selected or error occurs)
+            bg_color = "#c8f7c5" if evaluation.status == Status.GREEN else "#fff4cc" if evaluation.status == Status.YELLOW else "#ffc9c9"
+
+            if evaluation.ui_type == "big_text":
+                actual = evaluation.ui_data["actual"]
+                target = evaluation.ui_data["target"]
+
+                tk.Label(tile, text=f"Aktuell: {actual:.2f}", font=("", 10)).pack(anchor="center")
+                tk.Label(tile, text=f"Ziel: ≤ {target:.2f}", font=("", 10)).pack(anchor="center", pady=(4, 0))
+
+                content = tk.Frame(tile, bg=bg_color)
+                content.pack(pady=16, fill="both", expand=True)
+                
+                # Fontcolor red if Status.RED, otherwise default color; shows the actual value prominently in the tile.
+                fg_color = "red" if evaluation.status == Status.RED else "black"
+                tk.Label(content, text=f"{actual:.1f}", font=("", 48, "bold"), fg=fg_color, bg=bg_color).pack(expand=True)
+
+            elif evaluation.ui_type == "dual_progress":
+                time_percent = evaluation.ui_data["time_percent"]
+                cp_percent = evaluation.ui_data["cp_percent"]
+
+                tk.Label(tile, text=f"Zeitfortschritt: {time_percent:.0f}%", font=("", 10)).pack(anchor="center")
+                tk.Label(tile, text=f"CP-Fortschritt: {cp_percent:.0f}%", font=("", 10)).pack(anchor="center", pady=(4, 0))
+
+                content = tk.Frame(tile, bg=bg_color)
+                content.pack(pady=12, fill="both", expand=True)
+
+                bar_frame = tk.Frame(content, bg=bg_color)
+                bar_frame.pack(expand=True)
+
+                tk.Label(bar_frame, text="Zeit", font=("", 9), bg=bg_color).grid(row=0, column=0, padx=4)
+                bar_time = ttk.Progressbar(bar_frame, orient="vertical", length=80, mode="determinate")
+                bar_time["value"] = min(100, max(0, time_percent))
+                bar_time.grid(row=1, column=0, padx=4)
+
+                tk.Label(bar_frame, text="CP", font=("", 9), bg=bg_color).grid(row=0, column=1, padx=4)
+                bar_cp = ttk.Progressbar(bar_frame, orient="vertical", length=80, mode="determinate")
+                bar_cp["value"] = min(100, max(0, cp_percent))
+                bar_cp.grid(row=1, column=1, padx=4)
+                
+                # Placeholder below the bars to balance the height of the tile and ensure the bars
+                # are vertically centered, regardless of the content above.
+                tk.Frame(bar_frame, bg=bg_color, height=20, width=1).grid(row=2, column=0, columnspan=2)
+
+            elif evaluation.ui_type == "arrow":
+                actual = evaluation.ui_data["actual"]
+                target = evaluation.ui_data["target"]
+                arrow_char = evaluation.ui_data["arrow"]
+                
+                fg_col = "green" if evaluation.status == Status.GREEN else "orange" if evaluation.status == Status.YELLOW else "red"
+
+                tk.Label(tile, text=f"Ist: {actual:.2f} CP/Monat", font=("", 10)).pack(anchor="center")
+                tk.Label(tile, text=f"Soll: {target:.2f} CP/Monat", font=("", 10)).pack(anchor="center", pady=(4, 0))
+
+                content = tk.Frame(tile, bg=bg_color)
+                content.pack(pady=16, fill="both", expand=True)
+                tk.Label(content, text=arrow_char, font=("", 48), fg=fg_col, bg=bg_color).pack(expand=True)
+
     def _clear_tiles(self) -> None:
-        if not self._tile_labels.get("grade"):
-            return
+        """Destroys all dynamically created tiles in the container."""
+        for widget in self.container.winfo_children():
+            widget.destroy()
 
-        self._tile_labels["grade"]["actual"].config(text="—")
-        self._tile_labels["grade"]["target"].config(text="—")
-        self._tile_labels["grade"]["big"].config(text="—", fg="gray", bg="white")
+    def _show_placeholder(self) -> None:
+        """Displays a placeholder message when no student is selected."""
+        self._clear_tiles()
+        lbl = ttk.Label(
+            self.container, 
+            text="Für die Visualisierung der Leistung bitte Student auswählen", 
+            font=("", 24),
+            foreground="gray"
+        )
+        lbl.place(relx=0.5, rely=0.5, anchor="center")
 
-        self._tile_labels["deadline"]["time"].config(text="Zeitfortschritt: —")
-        self._tile_labels["deadline"]["cp"].config(text="CP-Fortschritt: —")
-        self._tile_bars["deadline_time"]["value"] = 0
-        self._tile_bars["deadline_cp"]["value"] = 0
-
-        self._tile_labels["pace"]["actual"].config(text="Ist: — CP/Monat")
-        self._tile_labels["pace"]["target"].config(text="Soll: — CP/Monat")
-        self._tile_labels["pace"]["arrow"].config(text="—", fg="gray", bg="white")
-
-        # Set content frames to white
-        for tile_key in ["grade", "deadline", "pace"]:
-            content_frame = self._tile_labels[tile_key].get("content_frame")
-            if content_frame:
-                content_frame.configure(bg="white")
-                for child in content_frame.winfo_children():
-                    if isinstance(child, tk.Label):
-                        child.configure(bg="white")
-                    elif isinstance(child, tk.Frame):
-                        child.configure(bg="white")
-                        
 @dataclass
 # --- Data Collection Form for Student and Goal Input ---
 class DataCollection(ttk.Frame):
@@ -403,20 +266,20 @@ class DataCollection(ttk.Frame):
         self.grade_var = tk.StringVar()
         self.passed_var = tk.StringVar()
 
-        enr = ttk.LabelFrame(self, text="Leistung (Enrollment)")
-        enr.pack(fill="x", padx=12, pady=(0, 12))
+        enrollment = ttk.LabelFrame(self, text="Leistung (Enrollment)")
+        enrollment.pack(fill="x", padx=12, pady=(0, 12))
 
-        ttk.Label(enr, text="Modul").grid(row=0, column=0, sticky="w", padx=8, pady=6)
-        self.module_combo = ttk.Combobox(enr, textvariable=self.selected_module_id_var, state="readonly", width=36)
+        ttk.Label(enrollment, text="Modul").grid(row=0, column=0, sticky="w", padx=8, pady=6)
+        self.module_combo = ttk.Combobox(enrollment, textvariable=self.selected_module_id_var, state="readonly", width=36)
         self.module_combo.grid(row=0, column=1, sticky="w", pady=6)
 
-        ttk.Label(enr, text="Note").grid(row=1, column=0, sticky="w", padx=8, pady=6)
-        ttk.Entry(enr, textvariable=self.grade_var, width=10).grid(row=1, column=1, sticky="w", pady=6)
+        ttk.Label(enrollment, text="Note").grid(row=1, column=0, sticky="w", padx=8, pady=6)
+        ttk.Entry(enrollment, textvariable=self.grade_var, width=10).grid(row=1, column=1, sticky="w", pady=6)
 
-        ttk.Label(enr, text="Bestanden am (TT.MM.JJJJ oder YYYY-MM-DD)").grid(row=2, column=0, sticky="w", padx=8, pady=6)
-        ttk.Entry(enr, textvariable=self.passed_var, width=16).grid(row=2, column=1, sticky="w", pady=6)
+        ttk.Label(enrollment, text="Bestanden am (TT.MM.JJJJ oder YYYY-MM-DD)").grid(row=2, column=0, sticky="w", padx=8, pady=6)
+        ttk.Entry(enrollment, textvariable=self.passed_var, width=16).grid(row=2, column=1, sticky="w", pady=6)
 
-        ttk.Button(enr, text="Leistung speichern", command=self._save_enrollment).grid(row=2, column=3, sticky="e", padx=8, pady=6)
+        ttk.Button(enrollment, text="Leistung speichern", command=self._save_enrollment).grid(row=2, column=3, sticky="e", padx=8, pady=6)
 
         self.refresh_module_dropdown()
 

@@ -141,8 +141,11 @@ class EvaluationCriterion:
 # Goal evaluation result data model
 @dataclass(frozen=True)
 class GoalEvaluation:
+    title: str
     status: Status
     criteria: list[EvaluationCriterion]
+    ui_type: str
+    ui_data: dict
 
 # Abstract base class for goals
 class Goal(ABC):
@@ -185,10 +188,13 @@ class GradeAverageGoal(Goal):
             status = Status.RED
 
         return GoalEvaluation(
+            title=self.get_title(),
             status=status,
             criteria=[
-                EvaluationCriterion(name=f"{self.get_title()} – Ø Note", value=avg, target=self.target_avg),
+                EvaluationCriterion(name=f"Aktuell", value=avg, target=self.target_avg),
             ],
+            ui_type="big_text",
+            ui_data={"actual": avg, "target": self.target_avg}
         )
 
 # DeadlineGoal implementation
@@ -197,7 +203,7 @@ class DeadlineGoal(Goal):
     duration_months: int
 
     def get_title(self) -> str:
-        return "Deadline / Plan"
+        return "Bachelorabschluss"
 
     def evaluate(self, student: Student, program: StudyProgram) -> GoalEvaluation:
         """
@@ -211,9 +217,9 @@ class DeadlineGoal(Goal):
         :return: The goal evaluation for the student.
         :rtype: GoalEvaluation
         """
-        time_pct = student.get_time_progress_percentage(self.duration_months)
-        cp_pct = student.get_cp_progress_percentage(program.total_ects)
-        delta = cp_pct - time_pct
+        time_percent = student.get_time_progress_percentage(self.duration_months)
+        cp_percent = student.get_cp_progress_percentage(program.total_ects)
+        delta = cp_percent - time_percent
 
         if delta >= 0:
             status = Status.GREEN
@@ -223,19 +229,23 @@ class DeadlineGoal(Goal):
             status = Status.RED
 
         return GoalEvaluation(
+            title=self.get_title(),
             status=status,
             criteria=[
-                EvaluationCriterion(name=f"{self.get_title()} – CP%", value=cp_pct, target=time_pct),
-                EvaluationCriterion(name=f"{self.get_title()} – Delta(CP%-Time%)", value=delta, target=0.0),
+                EvaluationCriterion(name=f"Zeitfortschritt (%)", value=time_percent, target=100.0),
+                EvaluationCriterion(name=f"CP-Fortschritt (%)", value=cp_percent, target=100.0),
             ],
+            ui_type="dual_progress",
+            ui_data={"time_percent": time_percent, "cp_percent": cp_percent}
         )
+
 # CpPaceGoal implementation
 @dataclass(frozen=True)
 class CpPaceGoal(Goal):
     target_cp_per_month: float
 
     def get_title(self) -> str:
-        return "CP Pace"
+        return "Arbeitstempo"
 
     def evaluate(self, student: Student, program: StudyProgram) -> GoalEvaluation:
         """
@@ -252,14 +262,20 @@ class CpPaceGoal(Goal):
         pace = student.get_cp_per_month()
         if pace >= self.target_cp_per_month:
             status = Status.GREEN
+            arrow = "↑"
         elif pace >= self.target_cp_per_month * 0.8:
             status = Status.YELLOW
+            arrow = "→"
         else:
             status = Status.RED
+            arrow = "↓"
 
         return GoalEvaluation(
+            title=self.get_title(),
             status=status,
             criteria=[
-                EvaluationCriterion(name=f"{self.get_title()} – CP/Monat", value=pace, target=self.target_cp_per_month),
+                EvaluationCriterion(name=f"Ist-Pace", value=pace, target=self.target_cp_per_month),
             ],
+            ui_type="arrow",
+            ui_data={"arrow": arrow, "actual": pace, "target": self.target_cp_per_month}
         )

@@ -20,7 +20,8 @@ class StudentRepository:
             raise RuntimeError("Database not connected")
 
         cursor = self.database.conn.cursor()
-        # ON CONFLICT clause ensures that if a student with the same student_id already exists, it will be updated instead of inserted.
+        # ON CONFLICT clause ensures that if a student with the same student_id already exists,
+        # it will be updated instead of inserted.
         cursor.execute(
             """
             INSERT INTO student (student_id, name, start_date)
@@ -48,7 +49,7 @@ class StudentRepository:
         if row is None:
             return None
 
-        sid, name, start_date_str = row
+        student_id, name, start_date_str = row
         start_date = datetime.date.fromisoformat(start_date_str)
 
         # Load enrollments for this student with a JOIN to get module details
@@ -88,8 +89,8 @@ class StudentRepository:
             elif goal_type == "DeadlineGoal":
                 goals.append(DeadlineGoal(duration_months=int(value)))
 
-        logging.info("Student aggregate loaded: %s (enrollments=%d, goals=%d)", sid, len(enrollments), len(goals))
-        return Student(student_id=sid, name=name, start_date=start_date, enrollments=enrollments, goals=goals)
+        logging.info("Student aggregate loaded: %s (enrollments=%d, goals=%d)", student_id, len(enrollments), len(goals))
+        return Student(student_id=student_id, name=name, start_date=start_date, enrollments=enrollments, goals=goals)
 
     # Save Goal objects for a student in the student_goals table. Deletes old goals and inserts new ones.
     def save_goals(self, student_id: str, goals: List[Goal]) -> None:
@@ -132,7 +133,7 @@ class StudentRepository:
         )
         out: List[Student] = []
         for student_id, name, start_date_str in cursor.fetchall():
-            out.append(Student(str(student_id), str(name), datetime.date.fromisoformat(start_date_str)))
+            out.append(Student(student_id=str(student_id), name=str(name), start_date=datetime.date.fromisoformat(start_date_str)))
         logging.info("Students listed: %d", len(out))
         return out
 
@@ -175,9 +176,9 @@ class ModuleRepository:
         row = cursor.fetchone()
         if row is None:
             return None
-        mid, title, ects = row
-        logging.info(f"Module {mid} retrieved successfully.")
-        return Module(mid, title, int(ects))
+        module_id, title, ects = row
+        logging.info(f"Module {module_id} retrieved successfully.")
+        return Module(module_id=module_id, title=title, ects=int(ects))
 
     # List all modules in the database, ordered by title. Used for dropdowns or lists.
     def list_all(self) -> List[Module]:
@@ -188,8 +189,8 @@ class ModuleRepository:
             "SELECT module_id, title, ects FROM module ORDER BY title COLLATE NOCASE, module_id"
         )
         out: List[Module] = []
-        for mid, title, ects in cursor.fetchall():
-            out.append(Module(str(mid), str(title), int(ects)))
+        for module_id, title, ects in cursor.fetchall():
+            out.append(Module(module_id=module_id, title=title, ects=int(ects)))
         logging.info("Modules listed: %d", len(out))
         return out
 

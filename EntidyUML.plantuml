@@ -108,7 +108,19 @@ package "Model" {
   }
   Goal <|-- CpPaceGoal
 
-  ' --- Business Logic ---
+  ' --- Business Logic / Interfaces ---
+  interface IDashboardService {
+    +update_student_data(student: Student): None
+    +get_student_aggregate(student_id: str): Student
+    +add_module_to_catalogue(module: Module): None
+    +update_study_progress(student_id: str, module_id: str, grade: float, date_passed: date): None
+    +evaluate_student_goals(student: Student): GoalEvaluation[*]
+    +list_students(): Student[*]
+    +list_modules(): Module[*]
+    +update_student_goals(student_id: str, duration_months: int, target_avg: float, target_cp_per_month: float): None
+    +close(): None
+  }
+
   class DashboardService {
     -student_repository: StudentRepository
     -module_repository: ModuleRepository
@@ -126,6 +138,9 @@ package "Model" {
     +update_student_goals(student_id: str, duration_months: int, target_avg: float, target_cp_per_month: float): None
     +close(): None
   }
+
+  IDashboardService <|.. DashboardService
+
   together {
     ' --- Persistence ---
     class Database {
@@ -185,7 +200,7 @@ package "Model" {
 ' =========================
 package "Controller" {
   class DashboardController {
-    -dashboard_service: DashboardService
+    -dashboard_service: IDashboardService
 
     +process_student_data(student: Student): None
     +process_module_data(module: Module): None
@@ -197,7 +212,7 @@ package "Controller" {
     +get_student_aggregate(student_id: str): Student
     +refresh_module_list(): Module[*]
   }
-  DashboardController --> DashboardService
+  DashboardController --> IDashboardService
   DashboardController ..> GoalEvaluation
   DashboardController ..> Student
   DashboardController ..> Module
@@ -281,11 +296,12 @@ package "View" {
 ' Wiring / Dependency Injection (Main)
 ' ==========================
 Main ..> Database : creates
-Main ..> StudentRepository : creates (injects Database)
 Main ..> ModuleRepository : creates (injects Database)
-Main ..> EnrollmentRepository : creates (injects Database)
+Main .right.> EnrollmentRepository : creates (injects Database)
+Main .left.> StudentRepository : creates (injects Database)
 Main ..> DashboardService : creates (injects Repositories)
-Main ..> DashboardController : creates (injects Service)
+Main ..> IDashboardService : bounds (DashboardService as IDashboardService)
+Main ..> DashboardController : creates (injects IDashboardService)
 Main ..> DashboardGUI : creates (injects Controller)
 
 

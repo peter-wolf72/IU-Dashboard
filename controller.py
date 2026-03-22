@@ -1,16 +1,28 @@
 # controller.py
 import datetime
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Protocol
 
-from services import DashboardService
 from model import Student, Module, GoalEvaluation
+
+# --- INTERFACE DEFINITION (DIP) ---
+class IDashboardService(Protocol):
+    def update_student_data(self, student: Student) -> None: ...
+    def get_student_aggregate(self, student_id: str) -> Student: ...
+    def add_module_to_catalogue(self, module: Module) -> None: ...
+    def update_study_progress(self, student_id: str, module_id: str, grade: Optional[float], date_passed: Optional[datetime.date]) -> None: ...
+    def evaluate_student_goals(self, student: Student) -> List[GoalEvaluation]: ...
+    def list_students(self) -> List[Student]: ...
+    def list_modules(self) -> List[Module]: ...
+    def update_student_goals(self, student_id: str, duration_months: int, target_avg: float, target_cp_per_month: float) -> None: ...
+    def close(self) -> None: ...
 
 @dataclass
 # Controller for the Dashboard application, responsible for handling user interactions 
 # and orchestrating between the view and service layers.
 class DashboardController:
-    dashboard_service: DashboardService
+    # Programmed against the abstraction, not the concrete class
+    dashboard_service: IDashboardService
 
     # Methods to process data from the view and delegate to the service layer
     def process_student_data(self, student: Student) -> None:

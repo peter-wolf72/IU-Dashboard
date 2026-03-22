@@ -8,7 +8,7 @@ from view import DashboardGUI
 from database import Database
 from repositories import StudentRepository, ModuleRepository, EnrollmentRepository
 from services import DashboardService
-from controller import DashboardController
+from controller import DashboardController, IDashboardService
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
@@ -24,13 +24,14 @@ def main():
     module_repository = ModuleRepository(database=database)
     enrollment_repository = EnrollmentRepository(database=database)
 
-    dashboard_service = DashboardService(
+    # Type annotation: We signal that we treat the service as an interface, not as a concrete implementation.
+    dashboard_service: IDashboardService = DashboardService(
         student_repository=student_repository,
         module_repository=module_repository,
         enrollment_repository=enrollment_repository,
     )
 
-    # Setup controller (UML: injects Service only)
+    # Setup controller (injects the interface)
     controller = DashboardController(dashboard_service=dashboard_service)
 
     # Setup and run GUI
