@@ -58,9 +58,9 @@ echo.
 echo [Schritt 1/4] Verzeichniswahl
 echo Das Dashboard kann im aktuellen Ordner oder in einem neuen Verzeichnis installiert werden.
 set "TARGET_DIR="
-set /p TARGET_DIR=Im aktuellen Verzeichnis installieren? (y) oder Pfad angeben: 
+set /p TARGET_DIR=Im aktuellen Verzeichnis installieren? (j) oder Pfad angeben: 
 
-if /I not "%TARGET_DIR%"=="y" if not "%TARGET_DIR%"=="" (
+if /I not "%TARGET_DIR%"=="j" if not "%TARGET_DIR%"=="" (
     echo Erstelle Verzeichnis: "%TARGET_DIR%"...
     REM Erstellt das Verzeichnis und alle Unterverzeichnisse
     mkdir "%TARGET_DIR%" 2>nul
@@ -135,9 +135,9 @@ echo "Die Installation ist abgeschlossen."
 echo "Es wurde eine Schnellstart-Datei 'dashboard_start.bat' erstellt."
 echo.
 set "START_CHOICE="
-set /p START_CHOICE=Moechtest du das Student Dashboard jetzt starten? (y/n): 
+set /p START_CHOICE=Moechtest du das Student Dashboard jetzt starten? (j/n): 
 
-if /I "%START_CHOICE%"=="y" (
+if /I "%START_CHOICE%"=="j" (
     echo "Starte Anwendung..."
     start "" .\venv\Scripts\pythonw.exe main.py
 ) else (

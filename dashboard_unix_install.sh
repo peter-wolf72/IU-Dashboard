@@ -15,9 +15,9 @@ echo "------------------------------------------------------------"
 # 1. Verzeichnis-Abfrage
 echo -e "${GREEN}[Schritt 1/6] Verzeichniswahl${NC}"
 echo "Das Dashboard kann im aktuellen Ordner oder in einem neuen Verzeichnis installiert werden."
-read -p "Möchtest du im aktuellen Verzeichnis installieren? (y) oder Pfad angeben: " TARGET_DIR
+read -p "Möchtest du im aktuellen Verzeichnis installieren? (j) oder Pfad angeben: " TARGET_DIR
 
-if [ "$TARGET_DIR" != "y" ] && [ "$TARGET_DIR" != "" ]; then
+if [ "$TARGET_DIR" != "j" ] && [ "$TARGET_DIR" != "" ]; then
     echo "Erstelle Verzeichnis: $TARGET_DIR..."
     mkdir -p "$TARGET_DIR"
     cd "$TARGET_DIR" || exit
@@ -140,9 +140,9 @@ echo "Datei $START_FILE wurde erfolgreich erstellt."
 echo -e "\n${GREEN}[Schritt 6/6] Abschluss${NC}"
 echo "------------------------------------------------------------"
 echo "Die Installation ist abgeschlossen."
-read -p "Möchtest du das Student Dashboard jetzt starten? (y/n): " START_CHOICE
+read -p "Möchtest du das Student Dashboard jetzt starten? (j/n): " START_CHOICE
 
-if [ "$START_CHOICE" == "y" ]; then
+if [ "$START_CHOICE" == "j" ]; then
     echo "Starte Anwendung..."
     python3 main.py
 else
