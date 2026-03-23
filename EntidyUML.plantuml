@@ -65,7 +65,10 @@ package "Model" {
   }
 
   class GoalEvaluation {
+    -title: str
     -status: Status
+    -ui_type: str
+    -ui_data: dict
     -criteria: EvaluationCriterion[*]
   }
 
@@ -240,18 +243,16 @@ package "View" {
   class TargetMonitoring {
     -master: tk.Misc
     -controller: DashboardController
-    -_tiles: dict
-    -_tile_labels: dict
-    -_tile_bars: dict
     -_student_rows: dict
+    -container: ttk.Frame
     -student_dropdown: ttk.Combobox
 
     +render(): None
     +refresh_student_dropdown(): None
     +on_student_selected(_evt): None
     +update_overview(data: GoalEvaluation[*]): None
-    -_set_tile_color(tile_key: str, status: Status): None
     -_clear_tiles(): None
+    -_show_placeholder(): None
   }
 
   class DataCollection {
